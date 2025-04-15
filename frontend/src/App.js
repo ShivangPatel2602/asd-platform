@@ -1,18 +1,12 @@
-import {useEffect, useState} from 'react';
+import React from 'react';
+import FormInput from './components/Form/FormInput';
+import "./App.css";
 
 function App() {
-  const [backendData, setBackendData] = useState(null);
-
-  useEffect(() => {
-    fetch("http://localhost:5000/api/health")
-    .then((res) => res.json())
-    .then((data) => setBackendData(data.status));
-  }, []);
-
   return (
-    <div style={{padding: "2rem"}}>
-      <h1>ASD Platform</h1>
-      <p>{backendData ? backendData : "Loading backend status..."}</p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <h1 className="app-heading">ASD Data</h1>
+      <FormInput />
     </div>
   );
 }
