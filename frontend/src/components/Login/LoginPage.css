@@ -1,0 +1,73 @@
+.login-container {
+    width: 400px;
+    margin: 80px auto;
+    padding: 32px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    background: #fff;
+    font-family: sans-serif;
+}
+
+.tab-buttons {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.tab-buttons button {
+    flex: 1;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    background: #f0f0f0;
+    cursor: pointer;
+    transition: 0.3s ease;
+}
+
+.tab-buttons .active {
+    background: #007bff;
+    color: #fff;
+}
+
+.form-section input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    font-weight: bold;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
+.separator {
+    text-align: center;
+    margin: 12px 0;
+    font-size: 14px;
+    color: #777;
+}
+
+.google-btn {
+    width: 100%;
+    padding: 10px;
+    background: 1px solid #4285F4;
+    color: white;
+    border: none;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.google-btn:hover {
+    background: #f2f2f2;
+}

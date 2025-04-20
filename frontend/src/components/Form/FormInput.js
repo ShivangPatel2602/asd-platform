@@ -37,11 +37,16 @@ const FormInput = () => {
         
         const parsed = rows.map(row => {
             const [cycle, thickness] = row.split(/\t|,|\s+/);
+            const cycleNum = parseFloat(cycle);
+            const thicknessNum = parseFloat(thickness);
+
+            if (isNaN(cycleNum)) return null;
+
             return {
-                cycles: parseFloat(cycle),
-                thickness: parseFloat(thickness)
+                cycles: cycleNum,
+                thickness: isNaN(thicknessNum) ? null : thicknessNum
             };
-        }).filter(point => !isNaN(point.cycles) && !isNaN(point.thickness));
+        }).filter(point => point !== null);
 
         const updatedForm = {
             ...form,
