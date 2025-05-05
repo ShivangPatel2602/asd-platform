@@ -8,7 +8,9 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
-CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+CORS(app, 
+     supports_credentials=True, 
+     origins=Config.ALLOWED_ORIGINS)
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587

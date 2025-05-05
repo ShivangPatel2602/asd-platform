@@ -14,6 +14,10 @@ class Config:
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
     EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
     
+    ALLOWED_ORIGINS = [
+        "https://asd-platform-frontend.onrender.com",
+        "http://localhost:3000"        
+    ] if os.getenv("FLASK_ENV") == "prod" else ["http://localhost:3000"]
     @staticmethod
     def init_app(app):
         pass
