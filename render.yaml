@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: asd-platform-backend
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn app:app
+    workingDir: backend
+    autoDeploy: true
+    envVars:
+      - key: FLASK_ENV
+        value: prod
