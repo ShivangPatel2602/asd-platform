@@ -79,7 +79,7 @@ def request_access():
         <p><strong>Department:</strong> {data['department']}</p>
         <p><strong>Status:</strong> {data['status']}</p>
         <p><strong>Purpose:</strong> {data['purpose']}</p>
-        <a href="http://localhost:5000/api/approve-access/{data['email']}">Click here to approve</a>
+        <a href="{Config.BACKEND_URL}/api/approve-access/{data['email']}">Click here to approve</a>
     """
     mail.send(admin_msg)
     
