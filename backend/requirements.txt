@@ -1,9 +1,11 @@
 authlib
 dotenv
+dnspython
 Flask
 Flask-Mail
 flask-cors
 gunicorn
 pymongo
+pymongo[srv]
 requests
 whitenoise
