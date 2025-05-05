@@ -1,4 +1,5 @@
 authlib
+dotenv
 Flask
 Flask-Mail
 flask-cors
