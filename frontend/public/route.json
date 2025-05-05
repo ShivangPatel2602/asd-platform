@@ -1,0 +1,27 @@
+{
+    "routes": [
+      {
+        "src": "/",
+        "dest": "/"
+      },
+      {
+        "src": "/dashboard",
+        "dest": "/"
+      },
+      {
+        "src": "/comparison",
+        "dest": "/"
+      },
+      {
+        "src": "/upload-data",
+        "dest": "/"
+      },
+      {
+        "handle": "filesystem"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "/"
+      }
+    ]
+  }
