@@ -1,3 +1,7 @@
+authlib
 Flask
+Flask-Mail
 flask-cors
+gunicorn
 pymongo
+whitenoise
