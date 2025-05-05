@@ -130,7 +130,7 @@ google = oauth.register(
 
 @app.route("/api/auth/google")
 def login():
-    redirect_uri = url_for('auth_callback', _external=True)
+    redirect_uri = f"{Config.BACKEND_URL}/api/auth/google/callback"
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/api/auth/google/callback')
@@ -139,9 +139,9 @@ def auth_callback():
     user_info = google.get('https://www.googleapis.com/oauth2/v2/userinfo').json()
     approved_user = approved_users.find_one({"email": user_info["email"]})
     if not approved_user:
-        return redirect('http://localhost:3000/?error=not_approved')
+        return redirect(f"{Config.FRONTEND_URL}/?error=not_approved")
     session['user'] = user_info
-    return redirect('http://localhost:3000/dashboard')
+    return redirect(f"{Config.FRONTEND_URL}/dashboard")
 
 @app.route('/api/user')
 def get_user():

@@ -13,6 +13,8 @@ class Config:
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
     EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
     
     ALLOWED_ORIGINS = [
         "https://asd-platform-frontend.onrender.com",
