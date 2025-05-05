@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import LabeledInput from "./LabeledInput";
+import Navbar from "../Navbar/Navbar";
 import { submitFormData } from "../../services/api";
 import "./FormInput.css";
 
-const FormInput = () => {
+const FormInput = ({setUser}) => {
     const [form, setForm] = useState({
         element: "",
         material: "",
@@ -86,60 +87,36 @@ const FormInput = () => {
     ]
 
     return (
-        <form onSubmit={handleSubmit} className="form-container">
-            <div className="grid">
-                {fields.map(({ id, label, fullWidth }) => (
-                    <div key={id} className={fullWidth ? "form-row" : ""}>
-                        <LabeledInput id={id} label={label} value={form[id]} onChange={handleChange}/>
-                    </div>
-                ))}
-            </div>
+        <>
+            <Navbar setUser={setUser} />
+            <form onSubmit={handleSubmit} className="form-container">
+                <div className="grid">
+                    {fields.map(({ id, label, fullWidth }) => (
+                        <div key={id} className={fullWidth ? "form-row" : ""}>
+                            <LabeledInput id={id} label={label} value={form[id]} onChange={handleChange}/>
+                        </div>
+                    ))}
+                </div>
 
-            <div className="readings-section">
-                <label htmlFor="cvst">Cycle vs Thickness</label><br />
-                <textarea 
-                    id="cvst"
-                    rows="10"
-                    cols="40"
-                    placeholder="Paste Data Here"
-                    value={rawData}
-                    onChange={(e) => setRawData(e.target.value)}
-                />
-            </div>
+                <div className="readings-section">
+                    <label htmlFor="cvst">Cycle vs Thickness</label><br />
+                    <textarea 
+                        id="cvst"
+                        rows="10"
+                        cols="40"
+                        placeholder="Paste Data Here"
+                        value={rawData}
+                        onChange={(e) => setRawData(e.target.value)}
+                    />
+                </div>
 
-            {/* <div className="readings-section">
-                <label className="block">Readings: Cycle vs Thickness</label>
-                {form.readings.map((pair, index) => (
-                    <div key={index} className="readings-container">
-                        <LabeledInput 
-                            id="cycles"
-                            label=""
-                            placeholder="Cycles"
-                            type="number"
-                            value={pair.cycles}
-                            onChange={(e) => handleCycleChange(index, e)}
-                        />
-                        <LabeledInput 
-                            id="thickness"
-                            label=""
-                            placeholder="Thickness (nm)"
-                            type="number"
-                            value={pair.thickness}
-                            onChange={(e) => handleCycleChange(index, e)}
-                        />
-                    </div>
-                ))}
-                <button type="button" onClick={addCyclePair} className="add-more-btn">
-                    + Add more
+                <button type="submit" className="submit-btn">
+                    Submit
                 </button>
-            </div> */}
 
-            <button type="submit" className="submit-btn">
-                Submit
-            </button>
-
-            {status && <p className="status-message">{status}</p>}
-        </form>
+                {status && <p className="status-message">{status}</p>}
+            </form>
+        </>
     );
 };
 

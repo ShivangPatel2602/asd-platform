@@ -40,7 +40,7 @@
 .submit-btn {
     width: 100%;
     padding: 10px;
-    background: #007bff;
+    background-color: #007bff;
     color: white;
     border: none;
     font-weight: bold;
@@ -53,21 +53,66 @@
     text-align: center;
     margin: 12px 0;
     font-size: 14px;
-    color: #777;
 }
 
 .google-btn {
     width: 100%;
     padding: 10px;
-    background: 1px solid #4285F4;
     color: white;
     border: none;
     font-weight: bold;
     border-radius: 4px;
     cursor: pointer;
     transition: 0.2s ease;
+    background-color: 1px solid #4285F4;
 }
 
-.google-btn:hover {
-    background: #f2f2f2;
+.form-section textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    font-size: 1rem;
+    min-height: 100px;
+    margin-bottom: 15px;
+}
+
+.form-section select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    background-color: white;
+}
+
+.message {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.message.error {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.message.success {
+    background-color: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+
+.message.error {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    padding: 12px;
+    border-radius: 6px;
+    margin: 10px 0;
+    text-align: center;
 }

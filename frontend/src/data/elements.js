@@ -1,0 +1,20 @@
+export const periodicTableGroups = {
+    1: ["H", "Li", "Na", "K", "Rb", "Cs", "Fr"],
+    2: ["Be", "Mg", "Ca", "Sr", "Ba", "Ra"],
+    3: ["Sc", "Y", "La", "Ac"],
+    4: ["Ti", "Zr", "Hf", "Rf"],
+    5: ["V", "Nb", "Ta", "Db"],
+    6: ["Cr", "Mo", "W", "Sg"],
+    7: ["Mn", "Tc", "Re", "Bh"],
+    8: ["Fe", "Ru", "Os", "Hs"],
+    9: ["Co", "Rh", "Ir", "Mt"],
+    10: ["Ni", "Pd", "Pt", "Ds"],
+    11: ["Cu", "Ag", "Au", "Rg"],
+    12: ["Zn", "Cd", "Hg", "Cn"],
+    13: ["B", "Al", "Ga", "In", "Tl", "Nh"],
+    14: ["C", "Si", "Ge", "Sn", "Pb", "Fl"],
+    15: ["N", "P", "As", "Sb", "Bi", "Mc"],
+    16: ["O", "S", "Se", "Te", "Po", "Lv"],
+    17: ["F", "Cl", "Br", "I", "At", "Ts"],
+    18: ["He", "Ne", "Ar", "Kr", "Xe", "Rn", "Og"]
+}
