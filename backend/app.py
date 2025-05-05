@@ -21,6 +21,13 @@ CORS(
         }
     })
 
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7)
+)
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', 'https://asd-platform-frontend.onrender.com')
@@ -139,9 +146,10 @@ def auth_callback():
     user_info = google.get('https://www.googleapis.com/oauth2/v2/userinfo').json()
     approved_user = approved_users.find_one({"email": user_info["email"]})
     if not approved_user:
-        return redirect(f"{Config.FRONTEND_URL}/?error=not_approved")
+        return redirect(f"{Config.FRONTEND_URL}/#/?error=not_approved")
+    session.permanent = True
     session['user'] = user_info
-    return redirect(f"{Config.FRONTEND_URL}/dashboard")
+    return redirect(f"{Config.FRONTEND_URL}/#/dashboard")
 
 @app.route('/api/user')
 def get_user():

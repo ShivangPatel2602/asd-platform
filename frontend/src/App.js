@@ -23,16 +23,19 @@ function App() {
           const userData = await response.json();
           localStorage.setItem("user", JSON.stringify(userData));
           setUser(userData);
+        } else {
+          localStorage.removeItem("user");
+          setUser(null);
         }
       } catch(error) {
       console.error("Error fetching user data:", error);
+      localStorage.removeItem("user");
+      setUser(null);
       }
     };
 
-    if (!user) {
-      fetchUser();
-    }
-  }, [user]);
+    fetchUser();
+  }, []);
 
   return (
     <Router>
@@ -60,6 +63,11 @@ function App() {
           <FormInput setUser={setUser} /> :
           <Navigate to="/" />
           } 
+        />
+        <Route 
+          path="*" element={
+            <Navigate to="/" />
+          }
         />
       </Routes>
     </Router>
