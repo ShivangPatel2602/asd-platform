@@ -17,7 +17,7 @@ class Config:
     ALLOWED_ORIGINS = [
         "https://asd-platform-frontend.onrender.com",
         "http://localhost:3000"        
-    ] if os.getenv("FLASK_ENV") == "prod" else ["http://localhost:3000"]
+    ]
     @staticmethod
     def init_app(app):
         pass

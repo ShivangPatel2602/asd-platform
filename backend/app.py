@@ -8,9 +8,26 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
-CORS(app, 
-     supports_credentials=True, 
-     origins=Config.ALLOWED_ORIGINS)
+CORS(
+    app, 
+    supports_credentials=True, 
+    resources={
+        r"/api/*": {
+            "origins": Config.ALLOWED_ORIGINS,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Range", "X-Content-Range"],
+            "suppport_credentials": True
+        }
+    })
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://asd-platform-frontend.onrender.com')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
