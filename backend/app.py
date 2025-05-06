@@ -15,26 +15,19 @@ CORS(
         r"/api/*": {
             "origins": Config.ALLOWED_ORIGINS,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
             "expose_headers": ["Content-Range", "X-Content-Range"],
-            "suppport_credentials": True
+            "support_credentials": True
         }
     })
 
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SAMESITE='None',
+    SESSION_COOKIE_DOMAIN=None,
     PERMANENT_SESSION_LIFETIME=timedelta(days=7)
 )
-
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://asd-platform-frontend.onrender.com')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
@@ -153,15 +146,16 @@ def auth_callback():
 
 @app.route('/api/user')
 def get_user():
-    print("Entered user route")
     user = session.get('user')
-    print("User info", user)
-    return jsonify(user) if user else ('Unauthorized', 401)
+    approved_user = approved_users.find_one({"email": user["email"]})
+    if not approved_user:
+        session.clear()
+    return jsonify(user)
 
-@app.route("/logout", methods=["GET"])
+@app.route("/api/logout", methods=["POST"])
 def logout():
     session.clear()
-    return "logged out", 200
+    return jsonify({"message": "Logged out successfully"}), 200
 
 @app.route("/api/data", methods=["POST"])
 def add_data():

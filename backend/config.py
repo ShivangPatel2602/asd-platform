@@ -17,8 +17,9 @@ class Config:
     BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
     
     ALLOWED_ORIGINS = [
-        "https://asd-platform-frontend.onrender.com",
-        "http://localhost:3000"        
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://asd-platform-frontend.onrender.com"
     ]
     @staticmethod
     def init_app(app):
