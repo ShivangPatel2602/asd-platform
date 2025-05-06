@@ -8,33 +8,43 @@ import MaterialSelector from './components/Comparison/Comparison';
 import "./App.css";
 
 function App() {
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem("user");
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchUser = async () => {
       try {
         const response = await fetch(`${config.BACKEND_API_URL}/api/user`, {
           credentials: "include",
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Origin': window.location.origin
+          },
         });
+
+        if (!mounted) return;
+
         if (response.ok) {
           const userData = await response.json();
-          localStorage.setItem("user", JSON.stringify(userData));
           setUser(userData);
         } else {
-          localStorage.removeItem("user");
           setUser(null);
         }
       } catch(error) {
-      console.error("Error fetching user data:", error);
-      localStorage.removeItem("user");
-      setUser(null);
+        console.error("Error fetching user data:", error);
+        if (mounted) {
+          setUser(null);
+        }
       }
     };
 
     fetchUser();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -48,7 +58,7 @@ function App() {
         />
         <Route path="/dashboard" element={
           user ?
-          <LandingPage setUser={setUser} /> :
+          <LandingPage setUser={setUser} user={user} /> :
           <Navigate to="/" />
           }
         />

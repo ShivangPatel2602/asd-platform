@@ -8,14 +8,20 @@ const Navbar = ({ setUser }) => {
 
     const handleLogout = async () => {
         try {
-            await fetch(`${config.BACKEND_API_URL}/logout`, {
-                method: "GET",
-                credentials: "include"
+            const response = await fetch(`${config.BACKEND_API_URL}/api/logout`, {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Origin': window.location.origin
+                }
             });
 
-            localStorage.removeItem("user");
-            setUser(null);
-            navigate("/");  // Redirect to Home
+            if (response.ok) {
+                setUser(null);
+                navigate("/");
+            }
         } catch (err) {
             console.error("Logout failed:", err);
         }

@@ -1,24 +1,14 @@
-import React, {useState, useEffect} from "react";
+import React, {useState} from "react";
 import Navbar from "../Navbar/Navbar";
 import { useNavigate } from 'react-router-dom';
 import "./LandingPage.css";
 import image from "../../images/ASD - Process.png";
 import { periodicTableGroups } from "../../data/elements";
 
-const LandingPage = ({ setUser }) => {
-    const [user, setLocalUser] = useState(() => {
-        const storedUser = localStorage.getItem("user");
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+const LandingPage = ({ setUser, user }) => {
     const [selectedGroup, setSelectedGroup] = useState("");
     const [selectedElement, setSelectedElement] = useState("");
     const navigate = useNavigate();
-
-    useEffect(() => {
-        if (!user) {
-            navigate("/");
-        }
-    }, [user, navigate]);
 
     const handleGroupChange = (e) => {
         setSelectedGroup(e.target.value);
