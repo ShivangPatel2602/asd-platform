@@ -31,7 +31,6 @@ const LandingPage = ({ setUser, user }) => {
             <section className="intro-section">
                 <div className="left">
                     <h2>What Is ASD??</h2>
-                    {user && <p>Welcome, {user.name || user.email}!</p>}
                     <div className="asd-content">
                         <div className="asd-description">
                             <p>

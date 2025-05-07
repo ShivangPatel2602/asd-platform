@@ -70,7 +70,7 @@ function App() {
         />
         <Route path="/upload-data" element={
           user ?
-          <FormInput setUser={setUser} /> :
+          <FormInput setUser={setUser} user={user} /> :
           <Navigate to="/" />
           } 
         />

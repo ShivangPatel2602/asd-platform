@@ -159,7 +159,15 @@ def logout():
 
 @app.route("/api/data", methods=["POST"])
 def add_data():
+    user = session.get('user')
+    
     data = request.get_json()
+    
+    submitter = {
+        "email": user.get("email"),
+        "name": user.get("name", "Unknown"),
+        "submission_date": datetime.now()
+    }
     
     element = data.get("element")
     material = data.get("material")
@@ -217,7 +225,8 @@ def add_data():
     # Step 05: Check if publication exists and add readings
     condition_doc["publications"].append({
         "publication": publication,
-        "readings": readings
+        "readings": readings,
+        "submittedBy": submitter
     })
     
     element_doc.pop("_id", None)

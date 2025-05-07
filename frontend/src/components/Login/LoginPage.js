@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import config from '../../config';
 import './LoginPage.css';
+import googleimg from '../../images/google.webp'
 
 const LoginPage = () => {
     const [activeTab, setActiveTab] = useState('login');
@@ -85,6 +86,10 @@ const LoginPage = () => {
                 {activeTab === 'login' ? (
                     <>
                         <button className='google-btn' onClick={handleGoogleLogin}>
+                            <img 
+                                src={googleimg}
+                                alt="Google logo" 
+                            />
                             Continue with Google
                         </button>
                     </>

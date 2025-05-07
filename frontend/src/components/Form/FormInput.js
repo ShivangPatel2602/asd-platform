@@ -4,7 +4,7 @@ import Navbar from "../Navbar/Navbar";
 import { submitFormData } from "../../services/api";
 import "./FormInput.css";
 
-const FormInput = ({setUser}) => {
+const FormInput = ({setUser, user}) => {
     const [form, setForm] = useState({
         element: "",
         material: "",
@@ -55,7 +55,7 @@ const FormInput = ({setUser}) => {
         }
 
         try {
-            await submitFormData(updatedForm);
+            await submitFormData(updatedForm, user);
             setStatus("Data saved successfully!");
             setRawData("");
             setDataPoints([]);
