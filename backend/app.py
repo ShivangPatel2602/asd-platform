@@ -322,29 +322,77 @@ def get_readings():
     pretreatment = request.args.get("pretreatment")
     publication = request.args.get("publication")
     
-    doc = collection.find_one({"element": element})
-    if not doc:
-        return jsonify([])
-    
-    material_doc = next((m for m in doc.get("materials", []) if m["material"] == material), None)
-    if not material_doc:
-        return jsonify([])
-    
-    pair_doc = next((p for p in material_doc.get("pre_cor", []) if p["precursor"] == precursor and p["coreactant"] == coreactant), None)
-    if not pair_doc:
-        return jsonify([])
-    
-    condition_doc = next((c for c in pair_doc.get("conditions", []) if c["surface"] == surface and c["pretreatment"] == pretreatment), None)
-    if not condition_doc:
-        return jsonify([])
+    try:
+        doc = collection.find_one({"element": element})
+        if not doc:
+            return jsonify([])
+        
+        material_doc = next((m for m in doc.get("materials", []) if m["material"] == material), None)
+        if not material_doc:
+            return jsonify([])
+        
+        pair_doc = next((p for p in material_doc.get("pre_cor", []) if p["precursor"] == precursor and p["coreactant"] == coreactant), None)
+        if not pair_doc:
+            return jsonify([])
+        
+        condition_doc = next((c for c in pair_doc.get("conditions", []) if c["surface"] == surface and c["pretreatment"] == pretreatment), None)
+        if not condition_doc:
+            return jsonify([])
 
-    publication_doc = next((p for p in condition_doc.get("publications", []) if p["publication"] == publication), None)
-    if not publication_doc:
-        return jsonify([])
+        publication_doc = next((p for p in condition_doc.get("publications", []) if p["publication"] == publication), None)
+        if not publication_doc:
+            return jsonify([])
 
-    readings = publication_doc.get("readings", [])
+        # Filter out readings with null thickness values
+        readings = [
+            reading for reading in publication_doc.get("readings", [])
+            if reading.get("thickness") is not None
+        ]
+        
+        return jsonify(readings)
+        
+    except Exception as e:
+        print(f"Error fetching readings: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
     
-    return jsonify(readings)
+@app.route("/api/element-data", methods=["GET"])
+def get_element_data():
+    try:
+        element = request.args.get("element")
+        if not element:
+            return jsonify({"error": "Element parameter is required"}), 400
+
+        doc = collection.find_one({"element": element})
+        if not doc:
+            return jsonify([])
+
+        formatted_data = []
+        for material in doc.get("materials", []):
+            material_name = material["material"]
+            for pair in material.get("pre_cor", []):
+                precursor = pair["precursor"]
+                coreactant = pair["coreactant"]
+                for condition in pair.get("conditions", []):
+                    surface = condition["surface"]
+                    pretreatment = condition["pretreatment"]
+                    temperature = condition.get("temperature")
+                    
+                    publications = [pub["publication"] for pub in condition.get("publications", [])]
+                    
+                    formatted_data.append({
+                        "material": material_name,
+                        "precursor": precursor,
+                        "coreactant": coreactant,
+                        "surface": surface,
+                        "pretreatment": pretreatment,
+                        "temperature": temperature,
+                        "publications": publications
+                    })
+
+        return jsonify(formatted_data)
+    except Exception as e:
+        print(f"Error getting element data: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

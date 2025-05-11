@@ -64,7 +64,7 @@ function App() {
         />
         <Route path="/comparison" element={
           user ?
-          <MaterialSelector element={null} /> :
+          <MaterialSelector setUser={setUser} /> :
           <Navigate to="/" />
           }
         />

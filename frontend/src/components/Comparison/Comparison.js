@@ -1,32 +1,20 @@
 import React, {useState, useEffect} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import Navbar from "../Navbar/Navbar";
 import config from '../../config';
 import './Comparison.css';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const MaterialSelector = () => {
+const MaterialSelector = ({setUser}) => {
     const [element, setElement] = useState('');
-    const [material, setMaterial] = useState('');
-    const [precursor, setPrecursor] = useState('');
-    const [coReactant, setCoReactant] = useState('');
-    const [surface, setSurface] = useState('');
-
-    const [pretreatment1, setPretreatment1] = useState('');
-    const [publication1, setPublication1] = useState('');
-    const [pretreatment2, setPretreatment2] = useState('');
-    const [publication2, setPublication2] = useState('');
-
-    const [materials, setMaterials] = useState([]);
-    const [precursors, setPrecursors] = useState([]);
-    const [coReactants, setCoReactants] = useState([]);
-    const [surfaces, setSurfaces] = useState([]);
-    const [pretreatments, setPretreatments] = useState([]);
-    const [publications1, setPublications1] = useState([]);
-    const [publications2, setPublications2] = useState([]);
+    const [elementData, setElementData] = useState([]);
+    const [selectedRows, setSelectedRows] = useState([]);
+    const [selectedPublications, setSelectedPublications] = useState({});
 
     const [readings1, setReadings1] = useState([]);
     const [readings2, setReadings2] = useState([]);
     const [showChart, setShowChart] = useState(false);
+    const [error, setError] = useState('');
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -38,76 +26,90 @@ const MaterialSelector = () => {
         const elementParam = params.get('element');
         if (elementParam) {
             setElement(elementParam);
-            // Immediately fetch materials when element is set
-            fetch(`${API_BASE_URL}/materials?element=${elementParam}`)
+            fetch(`${API_BASE_URL}/element-data?element=${elementParam}`)
                 .then(res => res.json())
                 .then(data => {
-                    if (data && data.length > 0) {
-                        setMaterials(data);
-                    } else {
-                        console.error('No materials found for element:', elementParam);
-                        navigate('/dashboard'); // Redirect if no data found
-                    }
+                    setElementData(data);
                 })
                 .catch(err => {
                     console.error('Error fetching materials:', err);
-                    navigate('/dashboard'); // Redirect on error
+                    navigate('/dashboard');
                 });
         } else {
             navigate('/dashboard'); // Redirect if no element parameter
         }
     }, [location, navigate]);
 
-    useEffect(() => {
-        fetch(`${API_BASE_URL}/precursors?element=${element}&material=${material}`)
-        .then(res => res.json())
-        .then(data => {
-            setPrecursors(data.precursors);
-            setCoReactants(data.coReactants);
-        })
-        .catch(err => console.error('Error fetching precursors and coreactants:', err));
-    }, [material, element]);
+    const handleRowSelect = (row, index) => {
+        setError('');
 
-    useEffect(() => {
-        fetch(`${API_BASE_URL}/surfaces?element=${element}&material=${material}&precursor=${precursor}&coreactant=${coReactant}`)
-        .then(res => res.json())
-        .then(data => {
-            setSurfaces(data.surfaces);
-            setPretreatments(data.pretreatments);
-        })
-        .catch(err => console.error('Error fetching surfaces and pretreatments:', err));
-    }, [precursor, coReactant, material, element]);
+        if (selectedRows.length < 2 && 
+            row.publications.length > 1 && 
+            !selectedPublications[index]) {
+            setError('Please select a publication first');
+            return;
+        }
 
-    useEffect(() => {
-        if (!(surface && pretreatment1)) return;
-        fetch(`${API_BASE_URL}/publications?element=${element}&material=${material}&precursor=${precursor}&coreactant=${coReactant}&surface=${surface}&pretreatment=${pretreatment1}`)
-        .then(res => res.json())
-        .then(data => setPublications1(data))
-        .catch(err => console.error('Error fetching publications:', err));
-    }, [surface, pretreatment1, material, precursor, coReactant, element]);
+        if (selectedRows.includes(index)) {
+            const newSelection = selectedRows.filter(i => i !== index);
+            setSelectedRows(newSelection);
+            if (newSelection.length < 2) {
+                setShowChart(false);
+                setReadings1([]);
+                setReadings2([]);
+            }
+            return;
+        }
 
-    useEffect(() => {
-        if (!(surface && pretreatment2)) return;
-        fetch(`${API_BASE_URL}/publications?element=${element}&material=${material}&precursor=${precursor}&coreactant=${coReactant}&surface=${surface}&pretreatment=${pretreatment2}`)
-        .then(res => res.json())
-        .then(data => setPublications2(data))
-        .catch(err => console.error('Error fetching publications:', err));
-    }, [surface, pretreatment2, material, precursor, coReactant, element]);
+        if (selectedRows.length === 2) {
+            setError('You can only select two rows for comparison');
+            return;
+        }
+
+        if (selectedRows.length === 1) {
+            const firstRow = elementData[selectedRows[0]];
+            if (firstRow.surface === row.surface) {
+                setError('Selected rows must have different surfaces');
+                return;
+            }
+            if (firstRow.material !== row.material || 
+                firstRow.precursor !== row.precursor || 
+                firstRow.coreactant !== row.coreactant || 
+                firstRow.pretreatment !== row.pretreatment) {
+                setError('Selected rows must have same material, precursor, coreactant, and pretreatment');
+                return;
+            }
+        }
+
+        setSelectedRows([...selectedRows, index]);
+    };
+
+    const handlePublicationSelect = (rowIndex, publication) => {
+        setSelectedPublications({
+            ...selectedPublications,
+            [rowIndex]: publication
+        });
+    };
 
     const generateComparison = () => {
-        if (!publication1 || !publication2) return;
+        if (selectedRows.length !== 2) return;
 
-        fetch(`${API_BASE_URL}/readings?element=${element}&material=${material}&precursor=${precursor}&coreactant=${coReactant}&surface=${surface}&pretreatment=${pretreatment1}&publication=${encodeURIComponent(publication1)}`)
-        .then(res => res.json())
-        .then(data => setReadings1(data))
-        .catch(err => console.error('Error fetching readings1:', err));
+        const row1 = elementData[selectedRows[0]];
+        const row2 = elementData[selectedRows[1]];
+        const pub1 = selectedPublications[selectedRows[0]];
+        const pub2 = selectedPublications[selectedRows[1]];
 
-        fetch(`${API_BASE_URL}/readings?element=${element}&material=${material}&precursor=${precursor}&coreactant=${coReactant}&surface=${surface}&pretreatment=${pretreatment2}&publication=${encodeURIComponent(publication2)}`)
-        .then(res => res.json())
-        .then(data => setReadings2(data))
-        .catch(err => console.error('Error fetching readings2:', err));
-        
-        setShowChart(true);
+        Promise.all([
+            fetch(`${API_BASE_URL}/readings?element=${element}&material=${row1.material}&precursor=${row1.precursor}&coreactant=${row1.coreactant}&surface=${row1.surface}&pretreatment=${row1.pretreatment}&publication=${encodeURIComponent(pub1)}`),
+            fetch(`${API_BASE_URL}/readings?element=${element}&material=${row2.material}&precursor=${row2.precursor}&coreactant=${row2.coreactant}&surface=${row2.surface}&pretreatment=${row2.pretreatment}&publication=${encodeURIComponent(pub2)}`)
+        ])
+        .then(([res1, res2]) => Promise.all([res1.json(), res2.json()]))
+        .then(([data1, data2]) => {
+            setReadings1(data1);
+            setReadings2(data2);
+            setShowChart(true);
+        })
+        .catch(err => console.error('Error fetching readings:', err));
     }
 
     const combinedData = () => {
@@ -130,108 +132,73 @@ const MaterialSelector = () => {
 
     return (
         <>
-            <div className='selector-container'>
-                <div className='parameters-section'>
-                    <h2>ASD Comparison</h2>
-                    <div className='common-section'>
-                        <label>Select Material:</label>
-                        <select value={material} onChange={(e) => setMaterial(e.target.value)}>
-                            <option value="">-- Select --</option>
-                            {materials.map((m) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-
-                        {material && (
-                            <>
-                                <label>Select Precursor:</label>
-                                <select value={precursor} onChange={(e) => setPrecursor(e.target.value)}>
-                                    <option value="">-- Select --</option>
-                                    {precursors.map((p) => <option key={p} value={p}>{p}</option>)}
-                                </select>
-
-                                <label>Select Co-Reactant:</label>
-                                <select value={coReactant} onChange={(e) => setCoReactant(e.target.value)}>
-                                    <option value="">-- Select --</option>
-                                    {coReactants.map((c) => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </>
-                        )}
-
-                        {precursor && coReactant && (
-                            <>
-                                <label>Select Surface:</label>
-                                <select value={surface} onChange={(e) => setSurface(e.target.value)}>
-                                    <option value="">-- Select --</option>
-                                    {surfaces.map((s) => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </>
-                        )}
-                    </div>
-
-                    {surface && (
-                        <div className='experiment-section'>
-                            <h3>Experiment 1</h3>
-                            <label>Select Pre-treatment:</label>
-                            <select value={pretreatment1} onChange={(e) => setPretreatment1(e.target.value)}>
-                                <option value=">">-- Select --</option>
-                                {pretreatments.map(pt => <option key={pt} value={pt}>{pt}</option>)}
-                            </select>
-
-                            {pretreatment1 && (
-                            <>
-                                <label>Select Publication:</label>
-                                {publications1.map((pub, idx) => (
-                                    <div key={`exp1-${idx}`} className="radio-option">
+            <Navbar setUser={setUser} />
+            <div className='comparison-container'>
+                <h2>Data for {element}</h2>
+                
+                {error && <div className="error-message">{error}</div>}
+                
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th>Precursor</th>
+                                <th>Co-reactant</th>
+                                <th>Surface</th>
+                                <th>Pretreatment</th>
+                                <th>Publications</th>
+                                <th>Select</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {elementData.map((row, index) => (
+                                <tr key={index} className={selectedRows.includes(index) ? 'selected' : ''}>
+                                    <td>{row.material}</td>
+                                    <td>{row.precursor}</td>
+                                    <td>{row.coreactant}</td>
+                                    <td>{row.surface}</td>
+                                    <td>{row.pretreatment}</td>
+                                    <td>
+                                        {row.publications.length > 1 ? (
+                                            <select 
+                                                value={selectedPublications[index] || ''}
+                                                onChange={(e) => handlePublicationSelect(index, e.target.value)}
+                                            >
+                                                <option value="">Select Publication</option>
+                                                {row.publications.map((pub, i) => (
+                                                    <option key={i} value={pub}>{pub}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            row.publications[0]
+                                        )}
+                                    </td>
+                                    <td>
                                         <input
-                                            type="radio"
-                                            id={`pub1-${idx}`}
-                                            name="publication1"
-                                            value={pub}
-                                            checked={publication1 === pub}
-                                            onChange={() => setPublication1(pub)}
+                                            type="checkbox"
+                                            checked={selectedRows.includes(index)}
+                                            onChange={() => handleRowSelect(row, index)}
+                                            disabled={selectedRows.length === 2 && !selectedRows.includes(index)}
                                         />
-                                        <label htmlFor={`pub1-${idx}`}>{pub}</label>
-                                    </div>
-                                ))}
-                            </>
-                            )}
-                        </div>
-                    )}
-
-                    {surface && (
-                        <div className="experiment-section">
-                            <h3>Experiment 2</h3>
-                            <label>Select Pre-Treatment:</label>
-                            <select value={pretreatment2} onChange={(e) => setPretreatment2(e.target.value)}>
-                                <option value="">-- Select --</option>
-                                {pretreatments.map(pt => <option key={pt} value={pt}>{pt}</option>)}
-                            </select>
-
-                            {pretreatment2 && (
-                                <>
-                                    <label>Select Publication:</label>
-                                    {publications2.map((pub, idx) => (
-                                        <div key={`exp2-${idx}`} className="radio-option">
-                                            <input
-                                                type="radio"
-                                                id={`pub2-${idx}`}
-                                                name="publication2"
-                                                value={pub}
-                                                checked={publication2 === pub}
-                                                onChange={() => setPublication2(pub)}
-                                            />
-                                            <label htmlFor={`pub2-${idx}`}>{pub}</label>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
-                        </div>
-                    )}
-                    {publication1 && publication2 && (
-                        <button className='compare-btn' onClick={generateComparison}>
-                            Generate Comparison
-                        </button>
-                    )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
+
+                {selectedRows.length === 2 && (
+                    <button 
+                        className="plot-button"
+                        onClick={generateComparison}
+                        disabled={selectedRows.some(index => 
+                            elementData[index].publications.length > 1 && !selectedPublications[index]
+                        )}
+                    >
+                        Plot Comparison
+                    </button>
+                )}
 
                 {showChart && (
                     <div className='chart-container'>
@@ -243,15 +210,14 @@ const MaterialSelector = () => {
                                 <YAxis label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft'}} />
                                 <Tooltip />
                                 <Legend />
-                                <Line type="monotone" dataKey="thickness1" stroke='#8884d8' name='Experiment 1' dot={{fill: 'black', r: 4}} />
-                                <Line type="monotone" dataKey="thickness2" stroke='#82ca9d' name='Experiment 2' dot={{fill: 'green', r: 4}} />
+                                <Line type="monotone" dataKey="thickness1" stroke='#8884d8' name='Surface 1' dot={{fill: 'black', r: 4}} />
+                                <Line type="monotone" dataKey="thickness2" stroke='#82ca9d' name='Surface 2' dot={{fill: 'green', r: 4}} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
                 )}
             </div>
-        </>
-        
+        </>        
     )
 };
 
