@@ -16,6 +16,8 @@ const MaterialSelector = ({setUser}) => {
     const [showChart, setShowChart] = useState(false);
     const [error, setError] = useState('');
 
+    const [isLoading, setIsLoading] = useState(true);
+
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -26,15 +28,23 @@ const MaterialSelector = ({setUser}) => {
         const elementParam = params.get('element');
         if (elementParam) {
             setElement(elementParam);
+            setIsLoading(true);
             fetch(`${API_BASE_URL}/element-data?element=${elementParam}`)
                 .then(res => res.json())
                 .then(data => {
-                    setElementData(data);
+                    if (data.length === 0) {
+                        setError('no-data');
+                    } else {
+                        setElementData(data);
+                    }
                 })
                 .catch(err => {
                     console.error('Error fetching materials:', err);
                     navigate('/dashboard');
-                });
+                })
+                .finally(() => {
+                    setIsLoading(false);
+                })
         } else {
             navigate('/dashboard'); // Redirect if no element parameter
         }
@@ -136,85 +146,110 @@ const MaterialSelector = ({setUser}) => {
             <div className='comparison-container'>
                 <h2>Data for {element}</h2>
                 
-                {error && <div className="error-message">{error}</div>}
-                
-                <div className="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Material</th>
-                                <th>Precursor</th>
-                                <th>Co-reactant</th>
-                                <th>Surface</th>
-                                <th>Pretreatment</th>
-                                <th>Publications</th>
-                                <th>Select</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {elementData.map((row, index) => (
-                                <tr key={index} className={selectedRows.includes(index) ? 'selected' : ''}>
-                                    <td>{row.material}</td>
-                                    <td>{row.precursor}</td>
-                                    <td>{row.coreactant}</td>
-                                    <td>{row.surface}</td>
-                                    <td>{row.pretreatment}</td>
-                                    <td>
-                                        {row.publications.length > 1 ? (
-                                            <select 
-                                                value={selectedPublications[index] || ''}
-                                                onChange={(e) => handlePublicationSelect(index, e.target.value)}
-                                            >
-                                                <option value="">Select Publication</option>
-                                                {row.publications.map((pub, i) => (
-                                                    <option key={i} value={pub}>{pub}</option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            row.publications[0]
-                                        )}
-                                    </td>
-                                    <td>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedRows.includes(index)}
-                                            onChange={() => handleRowSelect(row, index)}
-                                            disabled={selectedRows.length === 2 && !selectedRows.includes(index)}
-                                        />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {selectedRows.length === 2 && (
-                    <button 
-                        className="plot-button"
-                        onClick={generateComparison}
-                        disabled={selectedRows.some(index => 
-                            elementData[index].publications.length > 1 && !selectedPublications[index]
-                        )}
-                    >
-                        Plot Comparison
-                    </button>
-                )}
-
-                {showChart && (
-                    <div className='chart-container'>
-                        <h3>Cycle vs Thickness</h3>
-                        <ResponsiveContainer width="100%" height={400}>
-                            <LineChart data={combinedData()} margin={{top: 10, right: 30, left: 0, bottom: 0}}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="cycle" />
-                                <YAxis label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft'}} />
-                                <Tooltip />
-                                <Legend />
-                                <Line type="monotone" dataKey="thickness1" stroke='#8884d8' name='Surface 1' dot={{fill: 'black', r: 4}} />
-                                <Line type="monotone" dataKey="thickness2" stroke='#82ca9d' name='Surface 2' dot={{fill: 'green', r: 4}} />
-                            </LineChart>
-                        </ResponsiveContainer>
+                {isLoading ? (
+                    <div className="loading-container">
+                        <div className="loading-content">
+                            <div className="loading-spinner"></div>
+                            <p>Loading data...</p>
+                        </div>
                     </div>
+                ) : error === 'no-data' ? (
+                    <div className="no-data-container">
+                        <div className="no-data-content">
+                            <div className="no-data-icon">📊</div>
+                            <h3>No Data Available</h3>
+                            <p>There is currently no data available for {element}.</p>
+                            <p>Would you like to contribute by adding some data?</p>
+                            <button 
+                                className="upload-redirect-button"
+                                onClick={() => navigate('/upload-data')}
+                            >
+                                <span>⬆️</span>
+                                Upload Data
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Material</th>
+                                        <th>Precursor</th>
+                                        <th>Co-reactant</th>
+                                        <th>Surface</th>
+                                        <th>Pretreatment</th>
+                                        <th>Publications</th>
+                                        <th>Select</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {elementData.map((row, index) => (
+                                        <tr key={index} className={selectedRows.includes(index) ? 'selected' : ''}>
+                                            <td>{row.material}</td>
+                                            <td>{row.precursor}</td>
+                                            <td>{row.coreactant}</td>
+                                            <td>{row.surface}</td>
+                                            <td>{row.pretreatment}</td>
+                                            <td>
+                                                {row.publications.length > 1 ? (
+                                                    <select 
+                                                        value={selectedPublications[index] || ''}
+                                                        onChange={(e) => handlePublicationSelect(index, e.target.value)}
+                                                    >
+                                                        <option value="">Select Publication</option>
+                                                        {row.publications.map((pub, i) => (
+                                                            <option key={i} value={pub}>{pub}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    row.publications[0]
+                                                )}
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedRows.includes(index)}
+                                                    onChange={() => handleRowSelect(row, index)}
+                                                    disabled={selectedRows.length === 2 && !selectedRows.includes(index)}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {selectedRows.length === 2 && (
+                        <button 
+                            className="plot-button"
+                            onClick={generateComparison}
+                            disabled={selectedRows.some(index => 
+                                elementData[index].publications.length > 1 && !selectedPublications[index]
+                            )}
+                        >
+                            Plot Comparison
+                        </button>
+                        )}
+
+                        {showChart && (
+                            <div className='chart-container'>
+                                <h3>Cycle vs Thickness</h3>
+                                <ResponsiveContainer width="100%" height={400}>
+                                    <LineChart data={combinedData()} margin={{top: 10, right: 30, left: 0, bottom: 0}}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="cycle" />
+                                        <YAxis label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft'}} />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line type="monotone" dataKey="thickness1" stroke='#8884d8' name='Surface 1' dot={{fill: 'black', r: 4}} />
+                                        <Line type="monotone" dataKey="thickness2" stroke='#82ca9d' name='Surface 2' dot={{fill: 'green', r: 4}} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </>        

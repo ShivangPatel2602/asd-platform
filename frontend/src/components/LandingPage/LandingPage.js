@@ -1,29 +1,12 @@
-import React, {useState} from "react";
+import {useState} from "react";
 import Navbar from "../Navbar/Navbar";
+import PeriodicTable from "../PeriodicTable/PeriodicTable";
 import { useNavigate } from 'react-router-dom';
 import "./LandingPage.css";
 import image from "../../images/ASD - Process.png";
-import { periodicTableGroups } from "../../data/elements";
 
 const LandingPage = ({ setUser, user }) => {
-    const [selectedGroup, setSelectedGroup] = useState("");
-    const [selectedElement, setSelectedElement] = useState("");
     const navigate = useNavigate();
-
-    const handleGroupChange = (e) => {
-        setSelectedGroup(e.target.value);
-        setSelectedElement("");
-    }
-
-    const handleElementChange = (e) => {
-        setSelectedElement(e.target.value);
-    }
-
-    const handleExplore = () => {
-        if (selectedElement) {
-            navigate(`/comparison?element=${selectedElement}`);
-        }
-    }
 
     return (
         <>
@@ -43,38 +26,9 @@ const LandingPage = ({ setUser, user }) => {
                     </div>
                 </div>
 
-                <div className="right">
-                    <h2>Get Started</h2>
-                    <div className="form-group">
-                        <label htmlFor="groupno">Select Group No.</label>
-                        <select id="groupno" value={selectedGroup} onChange={handleGroupChange}>
-                            <option value="">Select a group</option>
-                            {Object.keys(periodicTableGroups).map((group) => (
-                                <option key={group} value={group}>
-                                    Group {group}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="elementname">Select Element</label>
-                        <select
-                            id="elementname"
-                            value={selectedElement}
-                            onChange={handleElementChange}
-                            disabled={!selectedGroup}
-                        >
-                            <option value="">Select an element</option>
-                            {selectedGroup && periodicTableGroups[selectedGroup].map((element) => (
-                                <option key={element} value={element}>
-                                    {element}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <button className="explore-btn" onClick={handleExplore} disabled={!selectedElement}>
-                        Explore Further
-                    </button>
+                <div className="periodic-table-section">
+                    <h2>Select an Element to Explore</h2>
+                    <PeriodicTable />
                 </div>
             </section>
         </>

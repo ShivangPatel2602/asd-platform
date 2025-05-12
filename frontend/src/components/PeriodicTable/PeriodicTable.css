@@ -1,0 +1,158 @@
+.periodic-table-container {
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.periodic-table {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(18, 1fr);
+    gap: 3px;
+}
+
+.element {
+    aspect-ratio: 1;
+    padding: 4px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.element:hover {
+    transform: scale(1.2);
+    z-index: 10;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.atomic-number {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 0.7em;
+    color: #666;
+}
+
+.symbol {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+}
+
+.name {
+    font-size: 0.6em;
+    color: #666;
+    text-align: center;
+    margin-top: 2px;
+}
+
+.element-spacer-first {
+    grid-column: span 16;
+}
+
+.element-spacer {
+    grid-column: span 10;
+}
+
+.element-spacer.small {
+    grid-column: span 3;
+}
+
+.spacer {
+    height: 20px;
+}
+
+.lanthanides,
+.actinides {
+    margin-left: 50px;
+}
+
+.alkali-metal { background-color: #ff6666; }
+.alkaline-earth { background-color: #ffdead; }
+.transition-metal { background-color: #ffc0c0; }
+.post-transition { background-color: #cccccc; }
+.metalloid { background-color: #cccc99; }
+.nonmetal { background-color: #a1ffc3; }
+.halogen { background-color: #ffff99; }
+.noble-gas { background-color: #c0ffff; }
+.lanthanoid { background-color: #ffbfff; }
+.actinoid { background-color: #ff99cc; }
+
+.element-tooltip {
+    position: fixed;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 100;
+    pointer-events: none;
+}
+
+.category-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 20px;
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.category-name {
+    font-size: 0.8em;
+    color: #333;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .element .name {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .periodic-table-container {
+        padding: 10px;
+    }
+    
+    .element {
+        padding: 2px;
+    }
+    
+    .atomic-number {
+        font-size: 0.6em;
+    }
+    
+    .symbol {
+        font-size: 0.9em;
+    }
+}

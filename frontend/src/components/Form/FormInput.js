@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import LabeledInput from "./LabeledInput";
 import Navbar from "../Navbar/Navbar";
 import { submitFormData } from "../../services/api";
@@ -20,6 +20,37 @@ const FormInput = ({setUser, user}) => {
     const [dataPoints, setDataPoints] = useState([]);
 
     const [status, setStatus] = useState("");
+
+    const sections = [
+        {
+            title: "Material Information",
+            fields: [
+                { id: "element", label: "Element", icon: "⚛️" },
+                { id: "material", label: "Material", icon: "🧪" },
+            ]
+        },
+        {
+            title: "Process Parameters",
+            fields: [
+                { id: "precursor", label: "Precursor", icon: "🔄" },
+                { id: "coreactant", label: "Co-reactant", icon: "⚡" },
+                { id: "temperature", label: "Temperature (°C)", type: "number", icon: "🌡️" }
+            ]
+        },
+        {
+            title: "Surface Details",
+            fields: [
+                { id: "surface", label: "Surface", icon: "📏" },
+                { id: "pretreatment", label: "Pre-treatment", icon: "🧹" },
+            ]
+        },
+        {
+            title: "Publication Details",
+            fields: [
+                { id: "publication", label: "Publication / DOI", icon: "📚", fullWidth: true }
+            ]
+        }
+    ];
 
     const handleChange = (e) => {
         setForm({
@@ -89,33 +120,61 @@ const FormInput = ({setUser, user}) => {
     return (
         <>
             <Navbar setUser={setUser} />
-            <form onSubmit={handleSubmit} className="form-container">
-                <div className="grid">
-                    {fields.map(({ id, label, fullWidth }) => (
-                        <div key={id} className={fullWidth ? "form-row" : ""}>
-                            <LabeledInput id={id} label={label} value={form[id]} onChange={handleChange}/>
+            <div className="form-page">
+                <h1 className="form-title">Submit New Data</h1>
+                <form onSubmit={handleSubmit} className="form-container">
+                    <div className="form-sections">
+                        {sections.map((section) => (
+                            <div key={section.title} className="form-section">
+                                <h2 className="section-title">
+                                    {section.title}
+                                </h2>
+                                <div className="section-fields">
+                                    {section.fields.map(({ id, label, icon, type, fullWidth }) => (
+                                        <div key={id} className={`field-container ${fullWidth ? 'full-width' : ''}`}>
+                                            <span className="field-icon">{icon}</span>
+                                            <LabeledInput 
+                                                id={id} 
+                                                label={label} 
+                                                type={type}
+                                                value={form[id]} 
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        <div className="form-section">
+                            <h2 className="section-title">
+                                <span className="field-icon">📊</span>
+                                Cycle vs Thickness Data
+                            </h2>
+                            <div className="readings-section">
+                                <textarea 
+                                    id="cvst"
+                                    rows="10"
+                                    placeholder="Paste your cycle vs thickness data here...&#10;Format: cycle thickness&#10;Example:&#10;0 0&#10;10 0.5&#10;20 1.0"
+                                    value={rawData}
+                                    onChange={(e) => setRawData(e.target.value)}
+                                />
+                            </div>
                         </div>
-                    ))}
-                </div>
+                    </div>
 
-                <div className="readings-section">
-                    <label htmlFor="cvst">Cycle vs Thickness</label><br />
-                    <textarea 
-                        id="cvst"
-                        rows="10"
-                        cols="40"
-                        placeholder="Paste Data Here"
-                        value={rawData}
-                        onChange={(e) => setRawData(e.target.value)}
-                    />
-                </div>
+                    <button type="submit" className="submit-btn">
+                        <span className="button-icon">💾</span>
+                        Submit Data
+                    </button>
 
-                <button type="submit" className="submit-btn">
-                    Submit
-                </button>
-
-                {status && <p className="status-message">{status}</p>}
-            </form>
+                    {status && (
+                        <div className={`status-message ${status.includes('success') ? 'success' : 'error'}`}>
+                            {status}
+                        </div>
+                    )}
+                </form>
+            </div>
         </>
     );
 };

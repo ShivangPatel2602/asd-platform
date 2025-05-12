@@ -1,15 +1,19 @@
 .intro-section {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     padding: 40px 24px;
-    gap: 40px;
     background-color: #f8fafc;
-    flex-wrap: wrap;
+    align-items: center;
 }
 
 .left {
-    flex: 2;
-    min-width: 300px;
+    width: 100%;
+    max-width: 1200px;
+    margin-bottom: 40px;
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .left h2 {
@@ -20,8 +24,8 @@
 
 .asd-content {
     display: flex;
-    flex-direction: column;
-    gap: 20px;
+    gap: 40px;
+    align-items: center;
 }
 
 .asd-description {
@@ -39,79 +43,37 @@
     width: 100%;
     height: auto;
     border-radius: 8px;
-    box-shadow: 04px 4px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-.right {
-    flex: 1;
-    flex-basis: 30%;
-    max-width: 30%;
-    min-width: 280px;
-    background-color: #ffffff;
+.periodic-table-section {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 24px;
+    background-color: #ffffff;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
-.right h2 {
+.periodic-table-section h2 {
+    text-align: center;
     font-size: 1.5rem;
     margin-bottom: 20px;
     color: #0f172a;
 }
 
-.form-group {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 16px;
-}
+@media (max-width: 768px) {
+    .intro-section {
+        padding: 20px 12px;
+    }
 
-.form-group label {
-    font-weight: 500;
-    margin-bottom: 6px;
-    color: #475569;
-}
+    .left,
+    .periodic-table-section {
+        padding: 12px;
+    }
 
-.form-group input {
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    font-size: 1rem;
-}
-
-.explore-btn {
-    margin-top: 12px;
-    background-color: #3b82f6;
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.explore-btn:hover {
-    background-color: #2563eb;
-}
-
-.form-group input,
-.form-group select {
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    font-size: 1rem;
-    background-color: white;
-    cursor: pointer;
-}
-
-.form-group select:disabled {
-    background-color: #f1f5f9;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-.form-group select:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    .asd-content {
+        flex-direction: column;
+    }
 }

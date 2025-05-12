@@ -2,27 +2,102 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    width: 100%;
 }
 
 .labeled-input label {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #4a4a4a;
+    color: #2d3748;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.required-marker {
+    color: #e53e3e;
+    font-size: 0.75rem;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 12px;
+    color: #4a5568;
+    font-size: 1rem;
+    pointer-events: none;
 }
 
 .labeled-input input {
-    border: 1px solid #dcdcdc;
-    border-radius: 5px;
+    width: 100%;
     padding: 0.75rem;
-    font-size: 1rem;
-    outline: none;
-    transition: border 0.3s ease;
+    font-size: 0.95rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background-color: #fff;
+    transition: all 0.2s ease;
+    color: #2d3748;
+}
+
+.labeled-input input.with-icon {
+    padding-left: 2.5rem;
+}
+
+.labeled-input input:hover {
+    border-color: #cbd5e0;
 }
 
 .labeled-input input:focus {
-    border-color: #3b82f6;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+    outline: none;
 }
 
 .labeled-input input::placeholder {
-    color: #a3a3a3;
+    color: #a0aec0;
+}
+
+.input-hint {
+    font-size: 0.75rem;
+    color: #718096;
+    margin-top: 0.25rem;
+}
+
+/* Input type specific styles */
+.labeled-input input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.labeled-input input[type="number"]::-webkit-outer-spin-button,
+.labeled-input input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Error state */
+.labeled-input.error input {
+    border-color: #fc8181;
+}
+
+.labeled-input.error .input-hint {
+    color: #e53e3e;
+}
+
+/* Disabled state */
+.labeled-input input:disabled {
+    background-color: #f7fafc;
+    cursor: not-allowed;
+    border-color: #edf2f7;
+}
+
+@media (max-width: 768px) {
+    .labeled-input input {
+        font-size: 1rem;
+        padding: 0.625rem;
+    }
 }
