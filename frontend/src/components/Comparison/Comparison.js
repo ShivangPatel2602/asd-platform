@@ -81,7 +81,7 @@ const MaterialSelector = ({setUser}) => {
         if (!selectedRows.includes(rowIndex)) {
             setSelectedRows([...selectedRows, rowIndex]);
         }
-        fetchDataForRow(row, publication, selectedRows.length === 0 ? 1 : 2);
+        fetchDataForRow(row, publication, rowIndex);
     };
 
     const fetchDataForRow = (row, publication, rowIndex) => {
