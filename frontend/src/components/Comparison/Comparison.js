@@ -10,15 +10,11 @@ const MaterialSelector = ({setUser}) => {
     const [elementData, setElementData] = useState([]);
     const [selectedRows, setSelectedRows] = useState([]);
     const [selectedPublications, setSelectedPublications] = useState({});
-
-    const [readings1, setReadings1] = useState([]);
-    const [readings2, setReadings2] = useState([]);
     const [showChart, setShowChart] = useState(false);
     const [error, setError] = useState('');
-
     const [isLoading, setIsLoading] = useState(true);
-
     const [readings, setReadings] = useState({});
+    const [selectivityData, setSelectivityData] = useState([]);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -52,85 +48,60 @@ const MaterialSelector = ({setUser}) => {
         }
     }, [location, navigate]);
 
-    const handleRowSelect = (row, index) => {
-        setError('');
-
-        const isSelected = selectedRows.includes(index);
-        if (isSelected) {
-            setSelectedRows(selectedRows.filter(i => i !== index));
-                if (selectedRows[0] === index) {
-                    setReadings1([]);
-                } else {
-                    setReadings2([]);
-                }
-        } else {
-            setSelectedRows([...selectedRows, index]);
-            if (row.publications.length === 1) {
-            handlePublicationSelect(index, row.publications[0]);
-        }
-        }
-    };
-
     const handlePublicationSelect = (rowIndex, publication) => {
-        setSelectedPublications({
-        ...selectedPublications,
-        [rowIndex]: publication
+        setSelectedPublications(prev => {
+            const currentSelected = prev[rowIndex] || [];
+            const isAlreadySelected = currentSelected.includes(publication);
+            
+            if (isAlreadySelected) {
+                const newSelected = currentSelected.filter(pub => pub !== publication);
+                const compositeKey = `${rowIndex}-${publication}`;
+                setReadings(prevReadings => {
+                    const { [compositeKey]: removed, ...rest } = prevReadings;
+                    return rest;
+                });
+                
+                if (newSelected.length === 0) {
+                    const { [rowIndex]: _, ...rest } = prev;
+                    return rest;
+                }
+                return { ...prev, [rowIndex]: newSelected };
+            }
+            
+            return {
+                ...prev,
+                [rowIndex]: [...currentSelected, publication]
+            };
         });
-    
-        const row = elementData[rowIndex];
-        if (!selectedRows.includes(rowIndex)) {
-            setSelectedRows([...selectedRows, rowIndex]);
+
+        if (!selectedPublications[rowIndex]?.includes(publication)) {
+            const row = elementData[rowIndex];
+            const compositeKey = `${rowIndex}-${publication}`;
+            fetchDataForRow(row, publication, compositeKey);
         }
-        fetchDataForRow(row, publication, rowIndex);
     };
 
-    const fetchDataForRow = (row, publication, rowIndex) => {
-    fetch(`${API_BASE_URL}/readings?element=${element}&material=${row.material}&precursor=${row.precursor}&coreactant=${row.coreactant}&surface=${row.surface}&pretreatment=${row.pretreatment}&publication=${encodeURIComponent(publication)}`)
-        .then(res => res.json())
-        .then(data => {
-            setReadings(prev => ({
-                ...prev,
-                [rowIndex]: data
-            }));
-            setShowChart(true);
-        })
-        .catch(err => {
-            console.error('Error fetching readings:', err);
-            setError('Failed to fetch reading data');
-        });
-};
-
-    const generateComparison = () => {
-        if (selectedRows.length !== 2) return;
-
-        const row1 = elementData[selectedRows[0]];
-        const row2 = elementData[selectedRows[1]];
-
-        const pub1 = row1.publications.length > 1 ? selectedPublications[selectedRows[0]] : row1.publications[0];
-        const pub2 = row2.publications.length > 1 ? selectedPublications[selectedRows[1]] : row2.publications[0];
-
-        Promise.all([
-        fetch(`${API_BASE_URL}/readings?element=${element}&material=${row1.material}&precursor=${row1.precursor}&coreactant=${row1.coreactant}&surface=${row1.surface}&pretreatment=${row1.pretreatment}&publication=${encodeURIComponent(pub1)}`),
-        fetch(`${API_BASE_URL}/readings?element=${element}&material=${row2.material}&precursor=${row2.precursor}&coreactant=${row2.coreactant}&surface=${row2.surface}&pretreatment=${row2.pretreatment}&publication=${encodeURIComponent(pub2)}`)
-        ])
-        .then(([res1, res2]) => Promise.all([res1.json(), res2.json()]))
-        .then(([data1, data2]) => {
-            console.log('Received data:', { data1, data2 });
-            setReadings1(data1);
-            setReadings2(data2);
-            setShowChart(true);
-        })
-        .catch(err => {
-            console.error('Error fetching readings:', err);
-            setError('Failed to fetch reading data');
-        });
-    }
+    const fetchDataForRow = (row, publication, compositeKey) => {
+        fetch(`${API_BASE_URL}/readings?element=${element}&material=${row.material}&precursor=${row.precursor}&coreactant=${row.coreactant}&surface=${row.surface}&pretreatment=${row.pretreatment}&publication=${encodeURIComponent(publication)}`)
+            .then(res => res.json())
+            .then(data => {
+                setReadings(prev => ({
+                    ...prev,
+                    [compositeKey]: data
+                }));
+                setShowChart(true);
+            })
+            .catch(err => {
+                console.error('Error fetching readings:', err);
+                setError('Failed to fetch reading data');
+            });
+    };
 
     const PublicationCell = ({ publications, index, onSelect }) => {
         if (publications.length > 5) {
             return (
                 <select 
-                    value={selectedPublications[index] || ''}
+                    value={selectedPublications[index]?.[0] || ''}
                     onChange={(e) => onSelect(index, e.target.value)}
                     className="publication-select"
                 >
@@ -147,7 +118,7 @@ const MaterialSelector = ({setUser}) => {
                 {publications.map((pub, i) => (
                     <span 
                         key={i}
-                        className={`publication-tag ${selectedPublications[index] === pub ? 'selected' : ''}`}
+                        className={`publication-tag ${selectedPublications[index]?.includes(pub) ? 'selected' : ''}`}
                         onClick={() => onSelect(index, pub)}
                     >
                         {pub}
@@ -189,24 +160,121 @@ const MaterialSelector = ({setUser}) => {
     const combinedData = () => {
         if (Object.keys(readings).length === 0) return [];
 
-    const allReadings = Object.values(readings).flat();
-    const maxCycle = Math.max(...allReadings.map(r => r.cycles));
-    const step = maxCycle <= 100 ? 5 : 10;
+        const allReadings = Object.values(readings).flat();
+        const maxCycle = Math.max(...allReadings.map(r => r.cycles));
+        const minCycle = Math.min(...allReadings.map(r => r.cycles));
+        const step = maxCycle <= 100 ? 5 : 10;
 
-    const uniformCycles = Array.from(
-        { length: Math.floor(maxCycle / step) + 1 },
-        (_, i) => i * step
-    );
+        const uniformCycles = Array.from(
+            { length: Math.floor((maxCycle - minCycle) / step) + 1 },
+            (_, i) => minCycle + (i * step)
+        );
 
-    return uniformCycles.map(cycle => {
-        const point = { cycle };
-        Object.entries(readings).forEach(([rowIndex, rowReadings]) => {
-            const reading = rowReadings.find(r => r.cycles === cycle);
-            point[`thickness_${rowIndex}`] = reading?.thickness ?? null;
-        });
-        return point;
-    }).filter(point => Object.keys(point).some(key => key.startsWith('thickness_') && point[key] !== null));
+        const interpolateValue = (cycle, readings) => {
+            const before = [...readings].reverse().find(r => r.cycles <= cycle);
+            const after = readings.find(r => r.cycles >= cycle);
+
+            if (before?.cycles === cycle) return before.thickness;
+            if (after?.cycles === cycle) return after.thickness;
+
+            if (before && after) {
+                const ratio = (cycle - before.cycles) / (after.cycles - before.cycles);
+                return before.thickness + (ratio * (after.thickness - before.thickness));
+            }
+
+            return null;
+        };
+
+        return uniformCycles.map(cycle => {
+            const point = { cycle };
+            Object.entries(readings).forEach(([compositeKey, rowReadings]) => {
+                if (Array.isArray(rowReadings) && rowReadings.length > 0) {
+                    const minDataCycle = Math.min(...rowReadings.map(r => r.cycles));
+                    const maxDataCycle = Math.max(...rowReadings.map(r => r.cycles));
+                    
+                    if (cycle >= minDataCycle && cycle <= maxDataCycle) {
+                        point[compositeKey] = interpolateValue(cycle, rowReadings);
+                    } else {
+                        point[compositeKey] = null;
+                    }
+                }
+            });
+            return point;
+        }).filter(point => 
+            Object.keys(point).some(key => 
+                key !== 'cycle' && point[key] !== null
+            )
+        );
     }
+
+    const renderLines = () => {
+        return Object.entries(readings).map(([compositeKey, rowReadings], i) => {
+            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00C49F', '#FFBB28'];
+            const [rowIndex, publication] = compositeKey.split('-');
+            
+            const actualPoints = rowReadings.map(r => r.cycles);
+            
+            return (
+                <Line 
+                    key={compositeKey}
+                    type="monotone" 
+                    dataKey={compositeKey} 
+                    stroke={colors[i % colors.length]}
+                    name={`${elementData[rowIndex].surface} (${publication})`}
+                    dot={(props) => {
+                        if (actualPoints.includes(props.payload.cycle)) {
+                            return (
+                                <circle 
+                                    cx={props.cx} 
+                                    cy={props.cy} 
+                                    r={4} 
+                                    fill={colors[i % colors.length]}
+                                />
+                            );
+                        }
+                        return null;
+                    }}
+                    connectNulls={true}
+                    activeDot={{ r: 6, strokeWidth: 2 }}
+                    strokeWidth={2}
+                />
+            );
+        });
+    };
+
+    const calculateSelectivity = () => {
+        const selectedReadings = Object.values(readings);
+        
+        if (selectedReadings.length !== 2) {
+            setSelectivityData([]);
+            return;
+        }
+
+        const [data1, data2] = selectedReadings;
+        const selectivityPoints = [];
+
+        const cycles1 = new Set(data1.map(r => r.cycles));
+        const cycles2 = new Set(data2.map(r => r.cycles));
+        const commonCycles = [...cycles1].filter(cycle => cycles2.has(cycle));
+
+        commonCycles.forEach(cycle => {
+            const t1 = data1.find(r => r.cycles === cycle)?.thickness;
+            const t2 = data2.find(r => r.cycles === cycle)?.thickness;
+            
+            if (t1 != null && t2 != null) {
+                selectivityPoints.push({
+                    cycle,
+                    selectivity: Math.abs(t1 - t2) / (t1 + t2)
+                });
+            }
+        });
+
+        setSelectivityData(selectivityPoints);
+    };
+
+    useEffect(() => {
+        calculateSelectivity();
+    }, [readings]);
 
     return (
         <>
@@ -294,7 +362,7 @@ const MaterialSelector = ({setUser}) => {
                                     <ResponsiveContainer width="100%" aspect={1}>
                                         <LineChart 
                                             data={combinedData()} 
-                                            margin={{top: 20, right: 30, left: 20, bottom: 20}}
+                                            margin={{top: 20, right: 110, left: 20, bottom: 20}}
                                         >
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis 
@@ -319,26 +387,49 @@ const MaterialSelector = ({setUser}) => {
                                                 formatter={(value) => value !== null ? `${value} nm` : 'No data'}
                                                 labelFormatter={(value) => `Cycle: ${value}`}
                                             />
-                                            <Legend />
-                                            {selectedRows.map((rowIndex, i) => {
-        const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00C49F', '#FFBB28'];
-        return (
-            <Line 
-                key={rowIndex}
-                type="monotone" 
-                dataKey={`thickness_${rowIndex}`} 
-                stroke={colors[i % colors.length]}
-                name={`${elementData[rowIndex].surface} (${selectedPublications[rowIndex] || elementData[rowIndex].publications[0]})`}
-                dot={{fill: colors[i % colors.length], r: 4}}
-                connectNulls={false}
-            />
-        );
-    })}
+                                            <Legend 
+                                                layout='vertical'
+                                                align='right'
+                                                verticalAlign='middle'                                            
+                                            />
+                                            {renderLines()}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
+                                {selectivityData.length > 0 && (
+                                    <div className='chart-container'>
+                                        <h3>Selectivity</h3>
+                                        <ResponsiveContainer width="100%" aspect={1.5}>
+                                            <LineChart 
+                                                data={selectivityData}
+                                                margin={{top: 20, right: 30, left: 20, bottom: 20}}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis 
+                                                    dataKey="cycle"
+                                                    type="number"
+                                                    label={{ value: 'Number of Cycles', position: 'bottom', offset: 0 }}
+                                                />
+                                                <YAxis
+                                                    label={{value: 'Selectivity', angle: -90, position: 'insideLeft', offset: 10}}
+                                                    domain={[0, 1]}
+                                                />
+                                                <Tooltip 
+                                                    formatter={(value) => value.toFixed(3)}
+                                                    labelFormatter={(value) => `Cycle: ${value}`}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="selectivity"
+                                                    stroke="#ff7300"
+                                                    dot={{fill: '#ff7300', r: 4}}
+                                                    connectNulls={true}
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
                             </>
-                            
                         )}
                     </>
                 )}
