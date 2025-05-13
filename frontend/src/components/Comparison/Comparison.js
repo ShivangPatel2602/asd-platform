@@ -18,6 +18,8 @@ const MaterialSelector = ({setUser}) => {
 
     const [isLoading, setIsLoading] = useState(true);
 
+    const [readings, setReadings] = useState({});
+
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -53,91 +55,157 @@ const MaterialSelector = ({setUser}) => {
     const handleRowSelect = (row, index) => {
         setError('');
 
-        if (selectedRows.length < 2 && 
-            row.publications.length > 1 && 
-            !selectedPublications[index]) {
-            setError('Please select a publication first');
-            return;
+        const isSelected = selectedRows.includes(index);
+        if (isSelected) {
+            setSelectedRows(selectedRows.filter(i => i !== index));
+                if (selectedRows[0] === index) {
+                    setReadings1([]);
+                } else {
+                    setReadings2([]);
+                }
+        } else {
+            setSelectedRows([...selectedRows, index]);
+            if (row.publications.length === 1) {
+            handlePublicationSelect(index, row.publications[0]);
         }
-
-        if (selectedRows.includes(index)) {
-            const newSelection = selectedRows.filter(i => i !== index);
-            setSelectedRows(newSelection);
-            if (newSelection.length < 2) {
-                setShowChart(false);
-                setReadings1([]);
-                setReadings2([]);
-            }
-            return;
         }
-
-        if (selectedRows.length === 2) {
-            setError('You can only select two rows for comparison');
-            return;
-        }
-
-        if (selectedRows.length === 1) {
-            const firstRow = elementData[selectedRows[0]];
-            if (firstRow.surface === row.surface) {
-                setError('Selected rows must have different surfaces');
-                return;
-            }
-            if (firstRow.material !== row.material || 
-                firstRow.precursor !== row.precursor || 
-                firstRow.coreactant !== row.coreactant || 
-                firstRow.pretreatment !== row.pretreatment) {
-                setError('Selected rows must have same material, precursor, coreactant, and pretreatment');
-                return;
-            }
-        }
-
-        setSelectedRows([...selectedRows, index]);
     };
 
     const handlePublicationSelect = (rowIndex, publication) => {
         setSelectedPublications({
-            ...selectedPublications,
-            [rowIndex]: publication
+        ...selectedPublications,
+        [rowIndex]: publication
         });
+    
+        const row = elementData[rowIndex];
+        if (!selectedRows.includes(rowIndex)) {
+            setSelectedRows([...selectedRows, rowIndex]);
+        }
+        fetchDataForRow(row, publication, selectedRows.length === 0 ? 1 : 2);
     };
+
+    const fetchDataForRow = (row, publication, rowIndex) => {
+    fetch(`${API_BASE_URL}/readings?element=${element}&material=${row.material}&precursor=${row.precursor}&coreactant=${row.coreactant}&surface=${row.surface}&pretreatment=${row.pretreatment}&publication=${encodeURIComponent(publication)}`)
+        .then(res => res.json())
+        .then(data => {
+            setReadings(prev => ({
+                ...prev,
+                [rowIndex]: data
+            }));
+            setShowChart(true);
+        })
+        .catch(err => {
+            console.error('Error fetching readings:', err);
+            setError('Failed to fetch reading data');
+        });
+};
 
     const generateComparison = () => {
         if (selectedRows.length !== 2) return;
 
         const row1 = elementData[selectedRows[0]];
         const row2 = elementData[selectedRows[1]];
-        const pub1 = selectedPublications[selectedRows[0]];
-        const pub2 = selectedPublications[selectedRows[1]];
+
+        const pub1 = row1.publications.length > 1 ? selectedPublications[selectedRows[0]] : row1.publications[0];
+        const pub2 = row2.publications.length > 1 ? selectedPublications[selectedRows[1]] : row2.publications[0];
 
         Promise.all([
-            fetch(`${API_BASE_URL}/readings?element=${element}&material=${row1.material}&precursor=${row1.precursor}&coreactant=${row1.coreactant}&surface=${row1.surface}&pretreatment=${row1.pretreatment}&publication=${encodeURIComponent(pub1)}`),
-            fetch(`${API_BASE_URL}/readings?element=${element}&material=${row2.material}&precursor=${row2.precursor}&coreactant=${row2.coreactant}&surface=${row2.surface}&pretreatment=${row2.pretreatment}&publication=${encodeURIComponent(pub2)}`)
+        fetch(`${API_BASE_URL}/readings?element=${element}&material=${row1.material}&precursor=${row1.precursor}&coreactant=${row1.coreactant}&surface=${row1.surface}&pretreatment=${row1.pretreatment}&publication=${encodeURIComponent(pub1)}`),
+        fetch(`${API_BASE_URL}/readings?element=${element}&material=${row2.material}&precursor=${row2.precursor}&coreactant=${row2.coreactant}&surface=${row2.surface}&pretreatment=${row2.pretreatment}&publication=${encodeURIComponent(pub2)}`)
         ])
         .then(([res1, res2]) => Promise.all([res1.json(), res2.json()]))
         .then(([data1, data2]) => {
+            console.log('Received data:', { data1, data2 });
             setReadings1(data1);
             setReadings2(data2);
             setShowChart(true);
         })
-        .catch(err => console.error('Error fetching readings:', err));
+        .catch(err => {
+            console.error('Error fetching readings:', err);
+            setError('Failed to fetch reading data');
+        });
     }
 
-    const combinedData = () => {
-        const minCycle = 0;
-        const maxCycle = 600;
-        const step = 10;
-
-        const uniformCycles = [];
-        for (let i = minCycle; i <= maxCycle; i += step) {
-            uniformCycles.push(i);
+    const PublicationCell = ({ publications, index, onSelect }) => {
+        if (publications.length > 5) {
+            return (
+                <select 
+                    value={selectedPublications[index] || ''}
+                    onChange={(e) => onSelect(index, e.target.value)}
+                    className="publication-select"
+                >
+                    <option value="">Select Publication</option>
+                    {publications.map((pub, i) => (
+                        <option key={i} value={pub}>{pub}</option>
+                    ))}
+                </select>
+            );
         }
 
-        // Map the uniform cycles to the data
-        return uniformCycles.map(cycle => ({
-            cycle,
-            thickness1: readings1.find(r => r.cycles === cycle)?.thickness ?? null,
-            thickness2: readings2.find(r => r.cycles === cycle)?.thickness ?? null,
-        }));
+        return (
+            <div className="publications-list">
+                {publications.map((pub, i) => (
+                    <span 
+                        key={i}
+                        className={`publication-tag ${selectedPublications[index] === pub ? 'selected' : ''}`}
+                        onClick={() => onSelect(index, pub)}
+                    >
+                        {pub}
+                    </span>
+                ))}
+            </div>
+        );
+    };
+
+    const handleClearSelections = () => {
+        setSelectedRows([]);
+    setSelectedPublications({});
+    setReadings({});
+    setShowChart(false);
+    };
+
+    const calculateAxisRanges = () => {
+        const allReadings = Object.values(readings).flat();
+    const allCycles = allReadings.map(r => r.cycles);
+    const allThickness = allReadings.map(r => r.thickness);
+    
+    const maxCycle = Math.max(...allCycles);
+    const maxThickness = Math.max(...allThickness);
+    
+    const cycleInterval = maxCycle <= 100 ? 10 : maxCycle <= 200 ? 20 : 50;
+    const thicknessInterval = Math.ceil(maxThickness / 10);
+    
+    const cycleDomain = [0, Math.ceil(maxCycle / cycleInterval) * cycleInterval];
+    const thicknessDomain = [0, Math.ceil(maxThickness / thicknessInterval) * thicknessInterval];
+    
+    return {
+        cycleInterval,
+        thicknessInterval,
+        cycleDomain,
+        thicknessDomain
+    };
+    };
+
+    const combinedData = () => {
+        if (Object.keys(readings).length === 0) return [];
+
+    const allReadings = Object.values(readings).flat();
+    const maxCycle = Math.max(...allReadings.map(r => r.cycles));
+    const step = maxCycle <= 100 ? 5 : 10;
+
+    const uniformCycles = Array.from(
+        { length: Math.floor(maxCycle / step) + 1 },
+        (_, i) => i * step
+    );
+
+    return uniformCycles.map(cycle => {
+        const point = { cycle };
+        Object.entries(readings).forEach(([rowIndex, rowReadings]) => {
+            const reading = rowReadings.find(r => r.cycles === cycle);
+            point[`thickness_${rowIndex}`] = reading?.thickness ?? null;
+        });
+        return point;
+    }).filter(point => Object.keys(point).some(key => key.startsWith('thickness_') && point[key] !== null));
     }
 
     return (
@@ -171,6 +239,12 @@ const MaterialSelector = ({setUser}) => {
                     </div>
                 ) : (
                     <>
+                        {error && (
+                            <div className='error-message'>
+                                <span className='error-icon'>⚠️</span>
+                                {error}
+                            </div>
+                        )}
                         <div className="table-container">
                             <table>
                                 <thead>
@@ -181,7 +255,6 @@ const MaterialSelector = ({setUser}) => {
                                         <th>Surface</th>
                                         <th>Pretreatment</th>
                                         <th>Publications</th>
-                                        <th>Select</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -193,26 +266,10 @@ const MaterialSelector = ({setUser}) => {
                                             <td>{row.surface}</td>
                                             <td>{row.pretreatment}</td>
                                             <td>
-                                                {row.publications.length > 1 ? (
-                                                    <select 
-                                                        value={selectedPublications[index] || ''}
-                                                        onChange={(e) => handlePublicationSelect(index, e.target.value)}
-                                                    >
-                                                        <option value="">Select Publication</option>
-                                                        {row.publications.map((pub, i) => (
-                                                            <option key={i} value={pub}>{pub}</option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    row.publications[0]
-                                                )}
-                                            </td>
-                                            <td>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedRows.includes(index)}
-                                                    onChange={() => handleRowSelect(row, index)}
-                                                    disabled={selectedRows.length === 2 && !selectedRows.includes(index)}
+                                                <PublicationCell 
+                                                    publications={row.publications}
+                                                    index={index}
+                                                    onSelect={handlePublicationSelect}
                                                 />
                                             </td>
                                         </tr>
@@ -221,33 +278,67 @@ const MaterialSelector = ({setUser}) => {
                             </table>
                         </div>
 
-                        {selectedRows.length === 2 && (
-                        <button 
-                            className="plot-button"
-                            onClick={generateComparison}
-                            disabled={selectedRows.some(index => 
-                                elementData[index].publications.length > 1 && !selectedPublications[index]
-                            )}
-                        >
-                            Plot Comparison
-                        </button>
-                        )}
-
                         {showChart && (
-                            <div className='chart-container'>
-                                <h3>Cycle vs Thickness</h3>
-                                <ResponsiveContainer width="100%" height={400}>
-                                    <LineChart data={combinedData()} margin={{top: 10, right: 30, left: 0, bottom: 0}}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="cycle" />
-                                        <YAxis label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft'}} />
-                                        <Tooltip />
-                                        <Legend />
-                                        <Line type="monotone" dataKey="thickness1" stroke='#8884d8' name='Surface 1' dot={{fill: 'black', r: 4}} />
-                                        <Line type="monotone" dataKey="thickness2" stroke='#82ca9d' name='Surface 2' dot={{fill: 'green', r: 4}} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <>
+                                <div className="clear-button-container">
+                                    <button 
+                                        className="clear-button"
+                                        onClick={handleClearSelections}
+                                    >
+                                        <span>🗑️</span>
+                                        Clear Choices
+                                    </button>
+                                </div>
+                                <div className='chart-container'>
+                                    <h3>Cycle vs Thickness</h3>
+                                    <ResponsiveContainer width="100%" aspect={1}>
+                                        <LineChart 
+                                            data={combinedData()} 
+                                            margin={{top: 20, right: 30, left: 20, bottom: 20}}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis 
+                                                dataKey="cycle"
+                                                type="number"
+                                                domain={calculateAxisRanges().cycleDomain}
+                                                ticks={Array.from(
+                                                    { length: Math.floor(calculateAxisRanges().cycleDomain[1] / calculateAxisRanges().cycleInterval) + 1 },
+                                                    (_, i) => i * calculateAxisRanges().cycleInterval
+                                                )}
+                                                label={{ value: 'Number of Cycles', position: 'bottom', offset: 0 }}
+                                            />
+                                            <YAxis 
+                                                label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft', offset: 10}}
+                                                domain={calculateAxisRanges().thicknessDomain}
+                                                ticks={Array.from(
+                                                    { length: Math.floor(calculateAxisRanges().thicknessDomain[1] / calculateAxisRanges().thicknessInterval) + 1 },
+                                                    (_, i) => i * calculateAxisRanges().thicknessInterval
+                                                )}
+                                            />
+                                            <Tooltip 
+                                                formatter={(value) => value !== null ? `${value} nm` : 'No data'}
+                                                labelFormatter={(value) => `Cycle: ${value}`}
+                                            />
+                                            <Legend />
+                                            {selectedRows.map((rowIndex, i) => {
+        const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00C49F', '#FFBB28'];
+        return (
+            <Line 
+                key={rowIndex}
+                type="monotone" 
+                dataKey={`thickness_${rowIndex}`} 
+                stroke={colors[i % colors.length]}
+                name={`${elementData[rowIndex].surface} (${selectedPublications[rowIndex] || elementData[rowIndex].publications[0]})`}
+                dot={{fill: colors[i % colors.length], r: 4}}
+                connectNulls={false}
+            />
+        );
+    })}
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </>
+                            
                         )}
                     </>
                 )}

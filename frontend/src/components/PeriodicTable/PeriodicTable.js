@@ -5,10 +5,16 @@ import './PeriodicTable.css';
 
 const PeriodicTable = () => {
     const [hoveredElement, setHoveredElement] = useState(null);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const navigate = useNavigate();
 
     const handleElementClick = (symbol) => {
         navigate(`/comparison?element=${symbol}`);
+    };
+
+    const handleMouseEnter = (element, event) => {
+        setHoveredElement(element);
+        setMousePos({ x: event.clientX, y: event.clientY });
     };
 
     const renderElement = (position) => {
@@ -20,7 +26,7 @@ const PeriodicTable = () => {
                 key={position}
                 className={`element ${element.category}`}
                 onClick={() => handleElementClick(element.symbol)}
-                onMouseEnter={() => setHoveredElement(element)}
+                onMouseEnter={(e) => handleMouseEnter(element, e)}
                 onMouseLeave={() => setHoveredElement(null)}
             >
                 <span className="atomic-number">{element.number}</span>
@@ -108,8 +114,8 @@ const PeriodicTable = () => {
             {hoveredElement && (
                 <div className="element-tooltip" 
                      style={{ 
-                         left: window.event?.clientX + 10, 
-                         top: window.event?.clientY + 10 
+                         left: mousePos.x + 10, 
+                         top: mousePos.y + 10 
                      }}>
                     <h3>{hoveredElement.name}</h3>
                     <p>Atomic Number: {hoveredElement.number}</p>
