@@ -104,6 +104,15 @@ tr.selected {
     cursor: not-allowed;
 }
 
+.charts-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 20px auto;
+    max-width: 1800px;
+    padding: 0 20px;
+}
+
 .charts-container {
     display: flex;
     flex-direction: row;
@@ -113,17 +122,30 @@ tr.selected {
 }
 
 .chart-container {
-    margin: 20px auto;
-    max-width: 900px;
-    aspect-ratio: 1;
-    padding: 20px;
     background: white;
+    padding: 20px;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    min-width: 0;
+}
+
+.recharts-cartesian-axis-line {
+    stroke-width: 2px;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+    stroke-width: 1.5px;
+}
+
+.recharts-text {
+    font-weight: 500;
 }
 
 .recharts-legend-item-text {
-    font-size: 0.9rem;
+    font-size:12px;
+    font-weight: 500;
     color: #4a5568;
 }
 

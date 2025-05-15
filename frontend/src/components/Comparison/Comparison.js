@@ -357,78 +357,92 @@ const MaterialSelector = ({setUser}) => {
                                         Clear Choices
                                     </button>
                                 </div>
-                                <div className='chart-container'>
-                                    <h3>Cycle vs Thickness</h3>
-                                    <ResponsiveContainer width="100%" aspect={1}>
-                                        <LineChart 
-                                            data={combinedData()} 
-                                            margin={{top: 20, right: 110, left: 20, bottom: 20}}
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis 
-                                                dataKey="cycle"
-                                                type="number"
-                                                domain={calculateAxisRanges().cycleDomain}
-                                                ticks={Array.from(
-                                                    { length: Math.floor(calculateAxisRanges().cycleDomain[1] / calculateAxisRanges().cycleInterval) + 1 },
-                                                    (_, i) => i * calculateAxisRanges().cycleInterval
-                                                )}
-                                                label={{ value: 'Number of Cycles', position: 'bottom', offset: 0 }}
-                                            />
-                                            <YAxis 
-                                                label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft', offset: 10}}
-                                                domain={calculateAxisRanges().thicknessDomain}
-                                                ticks={Array.from(
-                                                    { length: Math.floor(calculateAxisRanges().thicknessDomain[1] / calculateAxisRanges().thicknessInterval) + 1 },
-                                                    (_, i) => i * calculateAxisRanges().thicknessInterval
-                                                )}
-                                            />
-                                            <Tooltip 
-                                                formatter={(value) => value !== null ? `${value} nm` : 'No data'}
-                                                labelFormatter={(value) => `Cycle: ${value}`}
-                                            />
-                                            <Legend 
-                                                layout='vertical'
-                                                align='right'
-                                                verticalAlign='middle'                                            
-                                            />
-                                            {renderLines()}
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                {selectivityData.length > 0 && (
+                                <div className='charts-wrapper'>
                                     <div className='chart-container'>
-                                        <h3>Selectivity</h3>
-                                        <ResponsiveContainer width="100%" aspect={1.5}>
+                                        <h3>Cycle vs Thickness</h3>
+                                        <ResponsiveContainer width="100%" aspect={1}>
                                             <LineChart 
-                                                data={selectivityData}
-                                                margin={{top: 20, right: 30, left: 20, bottom: 20}}
+                                                data={combinedData()} 
+                                                margin={{top: 20, right: 110, left: 20, bottom: 20}}
                                             >
-                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <CartesianGrid strokeDasharray="3 3" strokeWidth={1.5} />
                                                 <XAxis 
                                                     dataKey="cycle"
                                                     type="number"
+                                                    domain={calculateAxisRanges().cycleDomain}
+                                                    ticks={Array.from(
+                                                        { length: Math.floor(calculateAxisRanges().cycleDomain[1] / calculateAxisRanges().cycleInterval) + 1 },
+                                                        (_, i) => i * calculateAxisRanges().cycleInterval
+                                                    )}
                                                     label={{ value: 'Number of Cycles', position: 'bottom', offset: 0 }}
+                                                    stroke='#666'
+                                                    strokeWidth={2}
+                                                    tick={{fontSize: 12, fontWeight: 500}}
                                                 />
-                                                <YAxis
-                                                    label={{value: 'Selectivity', angle: -90, position: 'insideLeft', offset: 10}}
-                                                    domain={[0, 1]}
+                                                <YAxis 
+                                                    label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft', offset: 10}}
+                                                    domain={calculateAxisRanges().thicknessDomain}
+                                                    stroke='#666'
+                                                    strokeWidth={2}
+                                                    tick={{fontSize: 12, fontWeight: 500}}
+                                                    ticks={Array.from(
+                                                        { length: Math.floor(calculateAxisRanges().thicknessDomain[1] / calculateAxisRanges().thicknessInterval) + 1 },
+                                                        (_, i) => i * calculateAxisRanges().thicknessInterval
+                                                    )}
                                                 />
                                                 <Tooltip 
-                                                    formatter={(value) => value.toFixed(3)}
+                                                    formatter={(value) => value !== null ? `${value} nm` : 'No data'}
                                                     labelFormatter={(value) => `Cycle: ${value}`}
                                                 />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="selectivity"
-                                                    stroke="#ff7300"
-                                                    dot={{fill: '#ff7300', r: 4}}
-                                                    connectNulls={true}
+                                                <Legend 
+                                                    layout='vertical'
+                                                    align='right'
+                                                    verticalAlign='middle'                                            
                                                 />
+                                                {renderLines()}
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </div>
-                                )}
+                                    {selectivityData.length > 0 && (
+                                        <div className='chart-container'>
+                                            <h3>Selectivity</h3>
+                                            <ResponsiveContainer width="100%" aspect={1}>
+                                                <LineChart 
+                                                    data={selectivityData}
+                                                    margin={{top: 20, right: 30, left: 20, bottom: 20}}
+                                                >
+                                                    <CartesianGrid strokeDasharray="3 3" strokeWidth={1.5} />
+                                                    <XAxis 
+                                                        dataKey="cycle"
+                                                        type="number"
+                                                        stroke='#666'
+                                                        strokeWidth={2}
+                                                        tick={{fontSize: 12, fontWeight: 500}}
+                                                        label={{ value: 'Thickness of Thicker Film', position: 'bottom', offset: 0 }}
+                                                    />
+                                                    <YAxis
+                                                        stroke='#666'
+                                                        strokeWidth={2}
+                                                        tick={{fontSize: 12, fontWeight: 500}}
+                                                        label={{value: 'Selectivity', angle: -90, position: 'insideLeft', offset: 10}}
+                                                        domain={[0, 1]}
+                                                    />
+                                                    <Tooltip 
+                                                        formatter={(value) => value.toFixed(3)}
+                                                        labelFormatter={(value) => `Cycle: ${value}`}
+                                                    />
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="selectivity"
+                                                        stroke="#ff7300"
+                                                        dot={{fill: '#ff7300', r: 4}}
+                                                        connectNulls={true}
+                                                    />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    )}
+                                </div>
                             </>
                         )}
                     </>
