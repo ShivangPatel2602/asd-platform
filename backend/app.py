@@ -160,7 +160,6 @@ def logout():
 @app.route("/api/data", methods=["POST"])
 def add_data():
     user = session.get('user')
-    
     data = request.get_json()
     
     submitter = {
@@ -189,7 +188,6 @@ def add_data():
             "element": element,
             "materials": []
         }
-        collection.insert_one(element_doc)
         
     # Step 02: Checking if material exists under the element
     material_doc = next((m for m in element_doc["materials"] if m["material"] == material), None)
@@ -212,7 +210,13 @@ def add_data():
         material_doc["pre_cor"].append(pair_doc)
         
     # Step 04: Check if (surface + pretreatment + temperature) exists
-    condition_doc = next((c for c in pair_doc["conditions"] if c["surface"] == surface and c["pretreatment"] == pretreatment and c["temperature"] == temperature), None)
+    condition_doc = next(
+        (c for c in pair_doc.get("conditions", []) 
+         if c["surface"] == surface and 
+         c["pretreatment"] == pretreatment and 
+         c["temperature"] == temperature),
+        None
+    )
     if not condition_doc:
         condition_doc = {
             "surface": surface,
@@ -222,14 +226,24 @@ def add_data():
         }
         pair_doc["conditions"].append(condition_doc)
         
-    # Step 05: Check if publication exists and add readings
-    condition_doc["publications"].append({
-        "publication": publication,
-        "readings": readings,
-        "submittedBy": submitter
-    })
+    pub_doc = next(
+        (p for p in condition_doc.get("publications", [])
+         if p["publication"] == publication),
+        None
+    )
     
-    element_doc.pop("_id", None)
+    if pub_doc:
+        pub_doc["readings"] = readings
+        pub_doc["submittedBy"] = submitter
+    else:
+        condition_doc["publications"].append({
+            "publication": publication,
+            "readings": readings,
+            "submittedBy": submitter
+        })
+        
+    if "_id" in element_doc:
+        element_doc.pop("_id")
     collection.replace_one({"element": element}, element_doc, upsert=True)
     
     return jsonify({"message": "Data added successfully"}), 201

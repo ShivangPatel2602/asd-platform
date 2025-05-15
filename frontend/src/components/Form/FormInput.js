@@ -2,6 +2,7 @@ import { useState } from "react";
 import LabeledInput from "./LabeledInput";
 import Navbar from "../Navbar/Navbar";
 import { submitFormData } from "../../services/api";
+import SurfaceReadingsInput from "./SurfaceReadings";
 import "./FormInput.css";
 
 const FormInput = ({setUser, user}) => {
@@ -10,14 +11,15 @@ const FormInput = ({setUser, user}) => {
         material: "",
         precursor: "",
         coreactant: "",
-        surface: "",
-        pretreatment: "",
         temperature: "",
         publication: "",
-        readings: [{ cycles: "", thickness: "" }],
     });
-    const [rawData, setRawData] = useState('');
-    const [dataPoints, setDataPoints] = useState([]);
+
+    const [surfaces, setSurfaces] = useState([{
+        surface: "",
+        pretreatment: "",
+        rawData: "",
+    }]);
 
     const [status, setStatus] = useState("");
 
@@ -38,13 +40,6 @@ const FormInput = ({setUser, user}) => {
             ]
         },
         {
-            title: "Surface Details",
-            fields: [
-                { id: "surface", label: "Surface", icon: "📏" },
-                { id: "pretreatment", label: "Pre-treatment", icon: "🧹" },
-            ]
-        },
-        {
             title: "Publication Details",
             fields: [
                 { id: "publication", label: "Publication / DOI", icon: "📚", fullWidth: true }
@@ -59,63 +54,67 @@ const FormInput = ({setUser, user}) => {
         });
     }
 
+    const handleSurfaceAdd = () => {
+        setSurfaces([...surfaces, {
+            surface: "",
+            pretreatment: "",
+            rawData: "",
+        }]);
+    };
+
+    const handleSurfaceRemove = (index) => {
+        setSurfaces(surfaces.filter((_, i) => i !== index));
+    };
+
+    const handleSurfaceDataChange = (index, field, value) => {
+        const newSurfaces = [...surfaces];
+        newSurfaces[index][field] = value;
+        setSurfaces(newSurfaces);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const rows = rawData
-            .split("\n")
-            .map(line => line.trim())
-            .filter(line => line.length > 0);
-        
-        const parsed = rows.map(row => {
-            const [cycle, thickness] = row.split(/\t|,|\s+/);
-            const cycleNum = parseFloat(cycle);
-            const thicknessNum = parseFloat(thickness);
-
-            if (isNaN(cycleNum)) return null;
-
-            return {
-                cycles: cycleNum,
-                thickness: isNaN(thicknessNum) ? null : thicknessNum
-            };
-        }).filter(point => point !== null);
-
-        const updatedForm = {
-            ...form,
-            readings: parsed
-        }
-
         try {
-            await submitFormData(updatedForm, user);
-            setStatus("Data saved successfully!");
-            setRawData("");
-            setDataPoints([]);
+            for (const surfaceData of surfaces) {
+                const readings = surfaceData.rawData
+                    .split("\n")
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .map(line => {
+                        const [cycle, thickness] = line.split(/\t|,|\s+/);
+                        return {
+                            cycles: parseFloat(cycle),
+                            thickness: parseFloat(thickness)
+                        };
+                    })
+                    .filter(reading => !isNaN(reading.cycles) && !isNaN(reading.thickness));
+
+                const submission = {
+                    ...form,
+                    surface: surfaceData.surface,
+                    pretreatment: surfaceData.pretreatment,
+                    readings
+                };
+
+                await submitFormData(submission, user);
+            }
+            
+            setStatus("All data saved successfully!");
+            setSurfaces([{ surface: "", pretreatment: "", rawData: "" }]);
             setForm({
                 element: "",
                 material: "",
                 precursor: "",
                 coreactant: "",
-                surface: "",
-                pretreatment: "",
                 temperature: "",
                 publication: "",
-                readings: [{ cycles: "", thickness: "" }],
             });
         } catch (error) {
             setStatus("Failed to save data");
+            console.error("Error submitting data:", error);
         }
     };
-
-    const fields = [
-        { id: "element", label: "Element" },
-        { id: "material", label: "Material" },
-        { id: "precursor", label: "Precursor" },
-        { id: "coreactant", label: "Co-reactant" },
-        { id: "surface", label: "Surface" },
-        { id: "pretreatment", label: "Pre-treatment" },
-        { id: "temperature", label: "Temperature (°C)", type: "number" },
-        { id: "publication", label: "Publication / DOI", fullWidth: true }
-    ]
 
     return (
         <>
@@ -148,18 +147,15 @@ const FormInput = ({setUser, user}) => {
 
                         <div className="form-section">
                             <h2 className="section-title">
-                                <span className="field-icon">📊</span>
-                                Cycle vs Thickness Data
+                                <span className="field-icon">🔍</span>
+                                Surface Details and Measurements
                             </h2>
-                            <div className="readings-section">
-                                <textarea 
-                                    id="cvst"
-                                    rows="10"
-                                    placeholder="Paste your cycle vs thickness data here...&#10;Format: cycle thickness&#10;Example:&#10;0 0&#10;10 0.5&#10;20 1.0"
-                                    value={rawData}
-                                    onChange={(e) => setRawData(e.target.value)}
-                                />
-                            </div>
+                            <SurfaceReadingsInput 
+                                surfaces={surfaces}
+                                onSurfaceAdd={handleSurfaceAdd}
+                                onSurfaceRemove={handleSurfaceRemove}
+                                onDataChange={handleSurfaceDataChange}
+                            />
                         </div>
                     </div>
 

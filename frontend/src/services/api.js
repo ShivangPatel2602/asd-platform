@@ -4,7 +4,15 @@ const API_BASE_URL = `${config.BACKEND_API_URL}/api`;
 
 export const submitFormData = async (data, user) => {
     const submissionData = {
-        ...data,
+        element: data.element,
+        material: data.material,
+        precursor: data.precursor,
+        coreactant: data.coreactant,
+        temperature: data.temperature,
+        publication: data.publication,
+        surface: data.surface,
+        pretreatment: data.pretreatment,
+        readings: data.readings,
         submittedBy: {
             email: user.email,
             name: user.name || 'Unknown',
