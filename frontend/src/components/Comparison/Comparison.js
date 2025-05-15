@@ -264,6 +264,7 @@ const MaterialSelector = ({setUser}) => {
             if (t1 != null && t2 != null) {
                 selectivityPoints.push({
                     cycle,
+                    thickness: Math.max(t1, t2),
                     selectivity: Math.abs(t1 - t2) / (t1 + t2)
                 });
             }
@@ -413,12 +414,12 @@ const MaterialSelector = ({setUser}) => {
                                                 >
                                                     <CartesianGrid strokeDasharray="3 3" strokeWidth={1.5} />
                                                     <XAxis 
-                                                        dataKey="cycle"
+                                                        dataKey="thickness"
                                                         type="number"
                                                         stroke='#666'
                                                         strokeWidth={2}
                                                         tick={{fontSize: 12, fontWeight: 500}}
-                                                        label={{ value: 'Thickness of Thicker Film', position: 'bottom', offset: 0 }}
+                                                        label={{ value: 'Thickness of Thicker Film (nm)', position: 'bottom', offset: 0 }}
                                                     />
                                                     <YAxis
                                                         stroke='#666'
