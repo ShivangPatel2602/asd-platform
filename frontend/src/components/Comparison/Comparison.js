@@ -306,7 +306,7 @@ const MaterialSelector = ({setUser}) => {
                                 <circle 
                                     cx={props.cx} 
                                     cy={props.cy} 
-                                    r={6} 
+                                    r={8} 
                                     fill={colors[i % colors.length]}
                                     stroke="#fff"
                                     strokeWidth={2}
@@ -316,8 +316,8 @@ const MaterialSelector = ({setUser}) => {
                         return null;
                     }}
                     connectNulls={true}
-                    activeDot={{ r: 8, strokeWidth: 2 }}
-                    strokeWidth={3}
+                    activeDot={{ r: 10, strokeWidth: 2 }}
+                    strokeWidth={4}
                 />
             );
         });
@@ -464,13 +464,13 @@ const MaterialSelector = ({setUser}) => {
                                                         { length: Math.floor(calculateAxisRanges().cycleDomain[1] / calculateAxisRanges().cycleInterval) + 1 },
                                                         (_, i) => i * calculateAxisRanges().cycleInterval
                                                     )}
-                                                    tick={{fontSize: 14, fontWeight: 500}}
+                                                    tick={{fontSize: 20, fontWeight: 500}}
                                                     label={{
                                                         value: 'Number of Cycles', 
                                                         position: 'bottom', 
                                                         offset: 0,
-                                                        fontSize: 16,
-                                                        fontWeight: 500
+                                                        fontSize: 22,
+                                                        fontWeight: 600
                                                     }}
                                                     stroke='#666'
                                                     strokeWidth={2}
@@ -481,34 +481,34 @@ const MaterialSelector = ({setUser}) => {
                                                         angle: -90, 
                                                         position: 'insideLeft', 
                                                         offset: 10,
-                                                        fontSize: 16,
-                                                        fontWeight: 500
+                                                        fontSize: 22,
+                                                        fontWeight: 600
                                                     }}
                                                     domain={calculateAxisRanges().thicknessDomain}
                                                     stroke='#666'
                                                     strokeWidth={2}
-                                                    tick={{fontSize: 14, fontWeight: 500}}
+                                                    tick={{fontSize: 20, fontWeight: 500}}
                                                     ticks={Array.from(
                                                         { length: Math.floor(calculateAxisRanges().thicknessDomain[1] / calculateAxisRanges().thicknessInterval) + 1 },
                                                         (_, i) => i * calculateAxisRanges().thicknessInterval
                                                     )}
                                                 />
+                                                <Legend 
+                                                    layout='vertical'
+                                                    align='right'
+                                                    verticalAlign='middle'
+                                                    wrapperStyle={{
+                                                        fontSize: '16px',
+                                                        fontWeight: 600
+                                                    }}                                          
+                                                />
                                                 <Tooltip 
                                                     formatter={(value) => value !== null ? `${value} nm` : 'No data'}
                                                     labelFormatter={(value) => `Cycle: ${value}`}
                                                     contentStyle={{
-                                                        fontSize: '14px',
+                                                        fontSize: '16px',
                                                         fontWeight: 500,
                                                     }}
-                                                />
-                                                <Legend 
-                                                    layout='vertical'
-                                                    align='right'
-                                                    verticalAlign='middle' 
-                                                    wrapperStyle={{
-                                                        fontSize: '14px',
-                                                        fontWeight: 500
-                                                    }}                                          
                                                 />
                                                 {renderLines()}
                                             </LineChart>
@@ -528,14 +528,14 @@ const MaterialSelector = ({setUser}) => {
                                                         type="number"
                                                         stroke='#666'
                                                         strokeWidth={2}
-                                                        tick={{fontSize: 12, fontWeight: 500}}
-                                                        label={{ value: 'Thickness of Thicker Film (nm)', position: 'bottom', offset: 0 }}
+                                                        tick={{fontSize: 16, fontWeight: 500}}
+                                                        label={{ value: 'Thickness of Thicker Film (nm)', position: 'bottom', offset: 0, fontSize: 18, fontWeight: 600 }}
                                                     />
                                                     <YAxis
                                                         stroke='#666'
                                                         strokeWidth={2}
-                                                        tick={{fontSize: 12, fontWeight: 500}}
-                                                        label={{value: 'Selectivity', angle: -90, position: 'insideLeft', offset: 10}}
+                                                        tick={{fontSize: 16, fontWeight: 500}}
+                                                        label={{value: 'Selectivity', angle: -90, position: 'insideLeft', offset: 10, fontSize: 18, fontWeight: 600}}
                                                         domain={[0, 1]}
                                                     />
                                                     <Tooltip 
@@ -548,11 +548,11 @@ const MaterialSelector = ({setUser}) => {
                                                         stroke="#ff7300"
                                                         dot={{
                                                             fill: '#ff7300', 
-                                                            r: 6,
+                                                            r: 8,
                                                             strokeWidth: 2,
                                                             stroke: '#fff'
                                                         }}
-                                                        strokeWidth={3}
+                                                        strokeWidth={4}
                                                         connectNulls={true}
                                                     />
                                                 </LineChart>
