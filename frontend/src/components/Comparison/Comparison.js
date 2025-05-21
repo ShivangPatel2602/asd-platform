@@ -97,6 +97,50 @@ const MaterialSelector = ({setUser}) => {
             });
     };
 
+    const getMergedRows = (data) => {
+        const mergedData = [];
+        let currentRowSpans = {
+            material: 0,
+            precursor: 0,
+            coreactant: 0,
+            pretreatment: 0
+        };
+        let previousValues = {
+            material: null,
+            precursor: null,
+            coreactant: null,
+            pretreatment: null
+        };
+
+        data.forEach((row, index) => {
+            const newRow = { ...row, spans: {} };
+
+            ['material', 'precursor', 'coreactant', 'pretreatment'].forEach(field => {
+                if (row[field] === previousValues[field]) {
+                    currentRowSpans[field]++;
+                    newRow.spans[field] = 0; 
+                } else {
+                    if (currentRowSpans[field] > 0) {
+                        mergedData[mergedData.length - currentRowSpans[field]].spans[field] = currentRowSpans[field] + 1;
+                    }
+                    currentRowSpans[field] = 0;
+                    newRow.spans[field] = 1;
+                    previousValues[field] = row[field];
+                }
+            });
+
+            mergedData.push(newRow);
+        });
+
+        ['material', 'precursor', 'coreactant', 'pretreatment'].forEach(field => {
+            if (currentRowSpans[field] > 0) {
+                mergedData[mergedData.length - currentRowSpans[field] - 1].spans[field] = currentRowSpans[field] + 1;
+            }
+        });
+
+        return mergedData;
+    };
+
     const PublicationCell = ({ publications, index, onSelect }) => {
         if (publications.length > 5) {
             return (
@@ -130,31 +174,31 @@ const MaterialSelector = ({setUser}) => {
 
     const handleClearSelections = () => {
         setSelectedRows([]);
-    setSelectedPublications({});
-    setReadings({});
-    setShowChart(false);
+        setSelectedPublications({});
+        setReadings({});
+        setShowChart(false);
     };
 
     const calculateAxisRanges = () => {
         const allReadings = Object.values(readings).flat();
-    const allCycles = allReadings.map(r => r.cycles);
-    const allThickness = allReadings.map(r => r.thickness);
-    
-    const maxCycle = Math.max(...allCycles);
-    const maxThickness = Math.max(...allThickness);
-    
-    const cycleInterval = maxCycle <= 100 ? 10 : maxCycle <= 200 ? 20 : 50;
-    const thicknessInterval = Math.ceil(maxThickness / 10);
-    
-    const cycleDomain = [0, Math.ceil(maxCycle / cycleInterval) * cycleInterval];
-    const thicknessDomain = [0, Math.ceil(maxThickness / thicknessInterval) * thicknessInterval];
-    
-    return {
-        cycleInterval,
-        thicknessInterval,
-        cycleDomain,
-        thicknessDomain
-    };
+        const allCycles = allReadings.map(r => r.cycles);
+        const allThickness = allReadings.map(r => r.thickness);
+        
+        const maxCycle = Math.max(...allCycles);
+        const maxThickness = Math.max(...allThickness);
+        
+        const cycleInterval = maxCycle <= 100 ? 10 : maxCycle <= 200 ? 20 : 50;
+        const thicknessInterval = Math.ceil(maxThickness / 10);
+        
+        const cycleDomain = [0, Math.ceil(maxCycle / cycleInterval) * cycleInterval];
+        const thicknessDomain = [0, Math.ceil(maxThickness / thicknessInterval) * thicknessInterval];
+        
+        return {
+            cycleInterval,
+            thicknessInterval,
+            cycleDomain,
+            thicknessDomain
+        };
     };
 
     const combinedData = () => {
@@ -227,16 +271,18 @@ const MaterialSelector = ({setUser}) => {
                                 <circle 
                                     cx={props.cx} 
                                     cy={props.cy} 
-                                    r={4} 
+                                    r={6} 
                                     fill={colors[i % colors.length]}
+                                    stroke="#fff"
+                                    strokeWidth={2}
                                 />
                             );
                         }
                         return null;
                     }}
                     connectNulls={true}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    strokeWidth={2}
+                    activeDot={{ r: 8, strokeWidth: 2 }}
+                    strokeWidth={3}
                 />
             );
         });
@@ -321,19 +367,27 @@ const MaterialSelector = ({setUser}) => {
                                         <th>Material</th>
                                         <th>Precursor</th>
                                         <th>Co-reactant</th>
-                                        <th>Surface</th>
                                         <th>Pretreatment</th>
+                                        <th>Surface</th>
                                         <th>Publications</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {elementData.map((row, index) => (
+                                    {getMergedRows(elementData).map((row, index) => (
                                         <tr key={index} className={selectedRows.includes(index) ? 'selected' : ''}>
-                                            <td>{row.material}</td>
-                                            <td>{row.precursor}</td>
-                                            <td>{row.coreactant}</td>
+                                            {row.spans.material > 0 && (
+                                                <td rowSpan={row.spans.material}>{row.material}</td>
+                                            )}
+                                            {row.spans.precursor > 0 && (
+                                                <td rowSpan={row.spans.precursor}>{row.precursor}</td>
+                                            )}
+                                            {row.spans.coreactant > 0 && (
+                                                <td rowSpan={row.spans.coreactant}>{row.coreactant}</td>
+                                            )}
+                                            {row.spans.pretreatment > 0 && (
+                                                <td rowSpan={row.spans.pretreatment}>{row.pretreatment}</td>
+                                            )}
                                             <td>{row.surface}</td>
-                                            <td>{row.pretreatment}</td>
                                             <td>
                                                 <PublicationCell 
                                                     publications={row.publications}
@@ -375,17 +429,30 @@ const MaterialSelector = ({setUser}) => {
                                                         { length: Math.floor(calculateAxisRanges().cycleDomain[1] / calculateAxisRanges().cycleInterval) + 1 },
                                                         (_, i) => i * calculateAxisRanges().cycleInterval
                                                     )}
-                                                    label={{ value: 'Number of Cycles', position: 'bottom', offset: 0 }}
+                                                    tick={{fontSize: 14, fontWeight: 500}}
+                                                    label={{
+                                                        value: 'Number of Cycles', 
+                                                        position: 'bottom', 
+                                                        offset: 0,
+                                                        fontSize: 16,
+                                                        fontWeight: 500
+                                                    }}
                                                     stroke='#666'
                                                     strokeWidth={2}
-                                                    tick={{fontSize: 12, fontWeight: 500}}
                                                 />
                                                 <YAxis 
-                                                    label={{value: 'Thickness (nm)', angle: -90, position: 'insideLeft', offset: 10}}
+                                                    label={{
+                                                        value: 'Thickness (nm)', 
+                                                        angle: -90, 
+                                                        position: 'insideLeft', 
+                                                        offset: 10,
+                                                        fontSize: 16,
+                                                        fontWeight: 500
+                                                    }}
                                                     domain={calculateAxisRanges().thicknessDomain}
                                                     stroke='#666'
                                                     strokeWidth={2}
-                                                    tick={{fontSize: 12, fontWeight: 500}}
+                                                    tick={{fontSize: 14, fontWeight: 500}}
                                                     ticks={Array.from(
                                                         { length: Math.floor(calculateAxisRanges().thicknessDomain[1] / calculateAxisRanges().thicknessInterval) + 1 },
                                                         (_, i) => i * calculateAxisRanges().thicknessInterval
@@ -394,11 +461,19 @@ const MaterialSelector = ({setUser}) => {
                                                 <Tooltip 
                                                     formatter={(value) => value !== null ? `${value} nm` : 'No data'}
                                                     labelFormatter={(value) => `Cycle: ${value}`}
+                                                    contentStyle={{
+                                                        fontSize: '14px',
+                                                        fontWeight: 500,
+                                                    }}
                                                 />
                                                 <Legend 
                                                     layout='vertical'
                                                     align='right'
-                                                    verticalAlign='middle'                                            
+                                                    verticalAlign='middle' 
+                                                    wrapperStyle={{
+                                                        fontSize: '14px',
+                                                        fontWeight: 500
+                                                    }}                                          
                                                 />
                                                 {renderLines()}
                                             </LineChart>
@@ -436,7 +511,13 @@ const MaterialSelector = ({setUser}) => {
                                                         type="monotone"
                                                         dataKey="selectivity"
                                                         stroke="#ff7300"
-                                                        dot={{fill: '#ff7300', r: 4}}
+                                                        dot={{
+                                                            fill: '#ff7300', 
+                                                            r: 6,
+                                                            strokeWidth: 2,
+                                                            stroke: '#fff'
+                                                        }}
+                                                        strokeWidth={3}
                                                         connectNulls={true}
                                                     />
                                                 </LineChart>

@@ -37,6 +37,22 @@ tr.selected {
     background-color: #e3f2fd;
 }
 
+table td[rowspan] {
+    background-color: #f8fafc;
+    vertical-align: middle;
+    /* text-align: center; */
+    border-right: 2px solid #e2e8f0;
+    transition: background-color 0.2s ease;
+}
+
+table td[rowspan]:hover {
+    background-color: #f1f5f9;
+}
+
+tr:hover td[rowspan] {
+    background-color: #f1f5f9;
+}
+
 .publications-list {
     display: flex;
     flex-wrap: wrap;
