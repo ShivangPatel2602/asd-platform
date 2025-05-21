@@ -100,45 +100,80 @@ const MaterialSelector = ({setUser}) => {
     const getMergedRows = (data) => {
         const mergedData = [];
         let currentRowSpans = {
-            material: 0,
-            precursor: 0,
-            coreactant: 0,
-            pretreatment: 0
+            material: 1,
+            precursor: 1,
+            coreactant: 1,
+            pretreatment: 1
         };
         let previousValues = {
-            material: null,
-            precursor: null,
-            coreactant: null,
-            pretreatment: null
+            material: data[0].material,
+            precursor: data[0].precursor,
+            coreactant: data[0].coreactant,
+            pretreatment: data[0].pretreatment
         };
 
-        data.forEach((row, index) => {
-            const newRow = { ...row, spans: {} };
-
-            ['material', 'precursor', 'coreactant', 'pretreatment'].forEach(field => {
-                if (row[field] === previousValues[field]) {
-                    currentRowSpans[field]++;
-                    newRow.spans[field] = 0; 
-                } else {
-                    if (currentRowSpans[field] > 0) {
-                        mergedData[mergedData.length - currentRowSpans[field]].spans[field] = currentRowSpans[field] + 1;
-                    }
-                    currentRowSpans[field] = 0;
-                    newRow.spans[field] = 1;
-                    previousValues[field] = row[field];
-                }
-            });
-
-            mergedData.push(newRow);
-        });
-
-        ['material', 'precursor', 'coreactant', 'pretreatment'].forEach(field => {
-            if (currentRowSpans[field] > 0) {
-                mergedData[mergedData.length - currentRowSpans[field] - 1].spans[field] = currentRowSpans[field] + 1;
+        mergedData.push({
+            ...data[0],
+            spans: {
+                material: 1,
+                precursor: 1,
+                coreactant: 1,
+                pretreatment: 1
             }
         });
 
-        return mergedData;
+        for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const newRow = { ...row, spans: {} };
+
+        // Check material
+        if (row.material === previousValues.material) {
+            mergedData[mergedData.length - currentRowSpans.material].spans.material++;
+            newRow.spans.material = 0;
+            currentRowSpans.material++;
+        } else {
+            newRow.spans.material = 1;
+            currentRowSpans.material = 1;
+            previousValues.material = row.material;
+        }
+
+        // Check precursor (only if material is same)
+        if (row.precursor === previousValues.precursor && newRow.spans.material === 0) {
+            mergedData[mergedData.length - currentRowSpans.precursor].spans.precursor++;
+            newRow.spans.precursor = 0;
+            currentRowSpans.precursor++;
+        } else {
+            newRow.spans.precursor = 1;
+            currentRowSpans.precursor = 1;
+            previousValues.precursor = row.precursor;
+        }
+
+        // Check coreactant (only if precursor is same)
+        if (row.coreactant === previousValues.coreactant && newRow.spans.precursor === 0) {
+            mergedData[mergedData.length - currentRowSpans.coreactant].spans.coreactant++;
+            newRow.spans.coreactant = 0;
+            currentRowSpans.coreactant++;
+        } else {
+            newRow.spans.coreactant = 1;
+            currentRowSpans.coreactant = 1;
+            previousValues.coreactant = row.coreactant;
+        }
+
+        // Check pretreatment (only if coreactant is same)
+        if (row.pretreatment === previousValues.pretreatment && newRow.spans.coreactant === 0) {
+            mergedData[mergedData.length - currentRowSpans.pretreatment].spans.pretreatment++;
+            newRow.spans.pretreatment = 0;
+            currentRowSpans.pretreatment++;
+        } else {
+            newRow.spans.pretreatment = 1;
+            currentRowSpans.pretreatment = 1;
+            previousValues.pretreatment = row.pretreatment;
+        }
+
+        mergedData.push(newRow);
+    }
+
+    return mergedData;
     };
 
     const PublicationCell = ({ publications, index, onSelect }) => {
