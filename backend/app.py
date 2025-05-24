@@ -42,6 +42,8 @@ db = client.get_database(Config.DB_NAME)
 collection = db["asd-platform"]
 access_collection = db["access-requests"]
 approved_users = db["approved-users"]
+pending_submissions = db["pending-submissions"]
+authorized_users = db["authorized-users"]
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
@@ -157,10 +159,18 @@ def logout():
     session.clear()
     return jsonify({"message": "Logged out successfully"}), 200
 
+@app.route("/api/check-authorization")
+def check_authorization():
+    email = request.args.get("email")
+    is_authorized = authorized_users.find_one({"email": email})
+    return jsonify({"isAuthorized": bool(is_authorized)})
+
 @app.route("/api/data", methods=["POST"])
 def add_data():
     user = session.get('user')
     data = request.get_json()
+    
+    is_authorized = authorized_users.find_one({"email": user.get("email")})
     
     submitter = {
         "email": user.get("email"),
@@ -168,6 +178,22 @@ def add_data():
         "submission_date": datetime.now()
     }
     
+    if is_authorized:
+        return add_data_to_db(data, submitter)
+    
+    submission_id = pending_submissions.insert_one({
+        "data": data,
+        "submitter": submitter,
+        "status": "pending",
+        "comments": [],
+        "submission_date": datetime.now()
+    }).inserted_id
+    
+    notify_authorized_users(data, submitter)
+    
+    return jsonify({"message": "Data submitted for review"}), 201
+
+def add_data_to_db(data, submitter):    
     element = data.get("element")
     material = data.get("material")
     precursor = data.get("precursor")
@@ -248,6 +274,24 @@ def add_data():
     
     return jsonify({"message": "Data added successfully"}), 201
 
+def notify_authorized_users(data, submitter):
+    authorized_emails = [user["email"] for user in authorized_users.find()]
+    
+    for email in authorized_emails:
+        notify_msg = Message(
+            'New Data Submission - ASD Platform',
+            sender=Config.ADMIN_EMAIL,
+            recipients=[email]
+        )
+        notify_msg.html = f"""
+            <h3>New Data Submission</h3>
+            <p><strong>Submitter:</strong> {submitter['name']}</p>
+            <p><strong>Element:</strong> {data['element']}</p>
+            <p><strong>Material:</strong> {data['material']}</p>
+            <p>Please review the submission on the platform.</p>
+        """
+        mail.send(notify_msg)
+        
 @app.route("/api/materials", methods=["GET"])
 def get_materials():
     element = request.args.get("element")

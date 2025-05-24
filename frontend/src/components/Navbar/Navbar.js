@@ -3,7 +3,7 @@ import {Link, useNavigate} from "react-router-dom";
 import config from "../../config";
 import './Navbar.css';
 
-const Navbar = ({ setUser }) => {
+const Navbar = ({ setUser, isAuthorized }) => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
@@ -34,7 +34,9 @@ const Navbar = ({ setUser }) => {
             </div>
             <div className="navbar-right">
                 <Link to="/upload-data" className="nav-link">Upload Data</Link>
-                <Link to="/compare-asd" className="nav-link">Compare ASD</Link>
+                {isAuthorized && (
+                    <Link to="/review-submissions" className="nav-link">Review Submissions</Link>
+                )}
                 <Link to="/search-papers" className="nav-link">Search Papers</Link>
                 <Link to="/know-more" className="nav-link">Know More</Link>
                 <button className="nav-link logout-btn" onClick={handleLogout}>Logout</button>

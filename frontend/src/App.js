@@ -5,10 +5,12 @@ import LoginPage from './components/Login/LoginPage';
 import LandingPage from './components/LandingPage/LandingPage';
 import FormInput from './components/Form/FormInput';
 import MaterialSelector from './components/Comparison/Comparison';
+import SubmissionReview from './components/Submissions/Submission';
 import "./App.css";
 
 function App() {
   const [user, setUser] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -29,13 +31,24 @@ function App() {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+
+          const authResponse = await fetch(
+            `${config.BACKEND_API_URL}/api/check-authorization?email=${userData.email}`,
+            { credentials: "include" }
+          );
+          if (authResponse.ok) {
+            const { isAuthorized: authStatus } = await authResponse.json();
+            setIsAuthorized(authStatus);
+          }
         } else {
           setUser(null);
+          setIsAuthorized(false);
         }
       } catch(error) {
         console.error("Error fetching user data:", error);
         if (mounted) {
           setUser(null);
+          setIsAuthorized(false);
         }
       }
     };
@@ -76,6 +89,14 @@ function App() {
         />
         <Route 
           path="*" element={
+            <Navigate to="/" />
+          }
+        />
+        <Route 
+          path='/review-submissions'
+          element={
+            user && isAuthorized ?
+            <SubmissionReview setUser={setUser} /> :
             <Navigate to="/" />
           }
         />
