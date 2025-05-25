@@ -5,14 +5,17 @@ import { submitFormData } from "../../services/api";
 import SurfaceReadingsInput from "./SurfaceReadings";
 import "./FormInput.css";
 
-const FormInput = ({setUser, user}) => {
+const FormInput = ({setUser, user, isAuthorized}) => {
     const [form, setForm] = useState({
         element: "",
         material: "",
         precursor: "",
         coreactant: "",
         temperature: "",
-        publication: "",
+        publication: {
+            author: "",
+            doi: ""
+        },
     });
 
     const [surfaces, setSurfaces] = useState([{
@@ -42,17 +45,40 @@ const FormInput = ({setUser, user}) => {
         {
             title: "Publication Details",
             fields: [
-                { id: "publication", label: "Publication / DOI", icon: "📚", fullWidth: true }
+                { 
+                    id: "publication.author", 
+                    label: "First Author", 
+                    icon: "👤",
+                    placeholder: "e.g., Smith"
+                },
+                { 
+                    id: "publication.doi", 
+                    label: "DOI", 
+                    icon: "🔗",
+                    placeholder: "e.g., 10.1021/example"
+                }
             ]
         }
     ];
 
     const handleChange = (e) => {
-        setForm({
-            ...form,    
-            [e.target.name]: e.target.value,
-        });
-    }
+        const { id, value } = e.target;
+        if (id.includes('.')) {
+            const [parent, child] = id.split('.');
+            setForm(prev => ({
+                ...prev,
+                [parent]: {
+                    ...prev[parent],
+                    [child]: value
+                }
+            }));
+        } else {
+            setForm(prev => ({
+                ...prev,
+                [id]: value
+            }));
+        }
+    };
 
     const handleSurfaceAdd = () => {
         setSurfaces([...surfaces, {
@@ -118,7 +144,7 @@ const FormInput = ({setUser, user}) => {
 
     return (
         <>
-            <Navbar setUser={setUser} />
+            <Navbar setUser={setUser} isAuthorized={isAuthorized} />
             <div className="form-page">
                 <h1 className="form-title">Submit New Data</h1>
                 <form onSubmit={handleSubmit} className="form-container">

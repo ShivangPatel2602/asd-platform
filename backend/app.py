@@ -1,25 +1,48 @@
-from flask import Flask, jsonify, request, redirect, url_for, session
+from flask import Flask, jsonify, request, redirect, session
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 from pymongo import MongoClient
 from config import Config
 from flask_mail import Mail, Message
 from datetime import datetime, timedelta
+from bson.objectid import ObjectId
+import json
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
 CORS(
     app, 
-    supports_credentials=True, 
     resources={
         r"/api/*": {
-            "origins": Config.ALLOWED_ORIGINS,
+            "origins": ["http://localhost:3000"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
             "expose_headers": ["Content-Range", "X-Content-Range"],
-            "support_credentials": True
+            "supports_credentials": True,
+            "send_wildcard": False,
+            "max_age": 86400
         }
-    })
+    },
+    supports_credentials=True
+)
+
+@app.before_request
+def handle_options():
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        headers = response.headers
+
+        origin = request.headers.get("Origin")
+        if origin:
+            headers["Access-Control-Allow-Origin"] = origin
+
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Headers"] = request.headers.get(
+            "Access-Control-Request-Headers", "Content-Type,Authorization"
+        )
+        headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS,PUT,DELETE"
+        return response
+
 
 app.config.update(
     SESSION_COOKIE_SECURE=True,
@@ -123,10 +146,6 @@ google = oauth.register(
     client_id=Config.GOOGLE_CLIENT_ID,
     client_secret=Config.GOOGLE_CLIENT_SECRET,
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    # access_token_params=None,
-    # authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
-    # authorize_params={'access_type': 'offline'},
-    # api_base_url='https://www.googleapis.com/oauth2/v2/',
     client_kwargs={'scope': 'openid email profile'},
 )
 
@@ -152,6 +171,8 @@ def get_user():
     approved_user = approved_users.find_one({"email": user["email"]})
     if not approved_user:
         session.clear()
+    is_authorized = authorized_users.find_one({"emails": {"$in": [user["email"]]}})
+    user["isAuthorized"] = bool(is_authorized)
     return jsonify(user)
 
 @app.route("/api/logout", methods=["POST"])
@@ -164,6 +185,72 @@ def check_authorization():
     email = request.args.get("email")
     is_authorized = authorized_users.find_one({"email": email})
     return jsonify({"isAuthorized": bool(is_authorized)})
+
+@app.route("/api/pending-submissions", methods=["GET"])
+def get_pending_submissions():
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    is_authorized = authorized_users.find_one({"emails": {"$in": [user.get("email")]}})
+    if not is_authorized:
+        return jsonify({"error": "Not authorized"}), 403
+    
+    submissions = list(pending_submissions.find())
+    for submission in submissions:
+        submission["_id"] = str(submission["_id"])
+    
+    return jsonify(submissions)
+
+@app.route("/api/submissions/<submission_id>", methods=["PUT"])
+def handle_submission(submission_id):
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    is_authorized = authorized_users.find_one({"emails": {"$in": [user.get("email")]}})
+    if not is_authorized:
+        return jsonify({"error": "Not authorized"}), 403
+    
+    data = request.get_json()
+    action = data.get('action')
+    comments = data.get('comments', '')
+    
+    submission = pending_submissions.find_one({"_id": ObjectId(submission_id)})
+    if not submission:
+        return jsonify({"error": "Submission not found"}), 404
+    
+    if action == 'approve':
+        # Add the data to main collection
+        result = add_data_to_db(submission['data'], submission['submitter'])
+        if result[1] != 201:
+            return jsonify({"error": "Failed to add data"}), 500
+        
+        # Remove from pending submissions
+        pending_submissions.delete_one({"_id": ObjectId(submission_id)})
+        
+    elif action == 'reject':
+        if not comments:
+            return jsonify({"error": "Comments required for rejection"}), 400
+            
+        # Send rejection email
+        user_msg = Message(
+            'Submission Rejected - ASD Platform',
+            sender=Config.ADMIN_EMAIL,
+            recipients=[submission['submitter']['email']]
+        )
+        user_msg.html = f"""
+            <h3>Submission Rejected</h3>
+            <p>Your recent data submission has been rejected.</p>
+            <p><strong>Reviewer Comments:</strong></p>
+            <p>{comments}</p>
+            <p>Please review the comments and submit again.</p>
+        """
+        mail.send(user_msg)
+        
+        pending_submissions.delete_one({"_id": ObjectId(submission_id)})
+    
+    return jsonify({"message": f"Submission {action}d successfully"})
 
 @app.route("/api/data", methods=["POST"])
 def add_data():
@@ -180,18 +267,17 @@ def add_data():
     
     if is_authorized:
         return add_data_to_db(data, submitter)
-    
-    submission_id = pending_submissions.insert_one({
-        "data": data,
-        "submitter": submitter,
-        "status": "pending",
-        "comments": [],
-        "submission_date": datetime.now()
-    }).inserted_id
-    
-    notify_authorized_users(data, submitter)
-    
-    return jsonify({"message": "Data submitted for review"}), 201
+    else:
+        pending_submissions.insert_one({
+            "data": data,
+            "submitter": submitter,
+            "status": "pending",
+            "submission_date": datetime.now()
+        })
+        return jsonify({
+            "message": "Your submission is pending approval. You will be notified if any changes are needed.",
+            "status": "pending"
+        }), 201
 
 def add_data_to_db(data, submitter):    
     element = data.get("element")
@@ -201,7 +287,12 @@ def add_data_to_db(data, submitter):
     surface = data.get("surface")
     pretreatment = data.get("pretreatment")
     temperature = data.get("temperature")
-    publication = data.get("publication")
+    publication_data = data.get("publication", {})
+    if isinstance(publication_data, str):
+        publication_data = {
+            "author": publication_data,
+            "doi": ""
+        }
     readings = data.get("readings", [])
     
     if not element:
@@ -254,7 +345,8 @@ def add_data_to_db(data, submitter):
         
     pub_doc = next(
         (p for p in condition_doc.get("publications", [])
-         if p["publication"] == publication),
+         if p["publication"]["author"] == publication_data["author"] and 
+         p["publication"]["doi"] == publication_data["doi"]),
         None
     )
     
@@ -263,7 +355,7 @@ def add_data_to_db(data, submitter):
         pub_doc["submittedBy"] = submitter
     else:
         condition_doc["publications"].append({
-            "publication": publication,
+            "publication": publication_data,
             "readings": readings,
             "submittedBy": submitter
         })
@@ -370,48 +462,51 @@ def get_publications():
     
     return jsonify(publications)
 
-@app.route("/api/readings", methods=["GET"])
+@app.route("/api/readings")
 def get_readings():
-    element = request.args.get("element")
-    material = request.args.get("material")
-    precursor = request.args.get("precursor")
-    coreactant = request.args.get("coreactant")
-    surface = request.args.get("surface")
-    pretreatment = request.args.get("pretreatment")
-    publication = request.args.get("publication")
-    
     try:
-        doc = collection.find_one({"element": element})
-        if not doc:
-            return jsonify([])
-        
-        material_doc = next((m for m in doc.get("materials", []) if m["material"] == material), None)
-        if not material_doc:
-            return jsonify([])
-        
-        pair_doc = next((p for p in material_doc.get("pre_cor", []) if p["precursor"] == precursor and p["coreactant"] == coreactant), None)
-        if not pair_doc:
-            return jsonify([])
-        
-        condition_doc = next((c for c in pair_doc.get("conditions", []) if c["surface"] == surface and c["pretreatment"] == pretreatment), None)
-        if not condition_doc:
-            return jsonify([])
+        element = request.args.get('element')
+        material = request.args.get('material')
+        precursor = request.args.get('precursor')
+        coreactant = request.args.get('coreactant')
+        surface = request.args.get('surface')
+        pretreatment = request.args.get('pretreatment')
+        publication = json.loads(request.args.get('publication'))
 
-        publication_doc = next((p for p in condition_doc.get("publications", []) if p["publication"] == publication), None)
-        if not publication_doc:
-            return jsonify([])
-
-        # Filter out readings with null thickness values
-        readings = [
-            reading for reading in publication_doc.get("readings", [])
-            if reading.get("thickness") is not None
+        pipeline = [
+            {"$match": {"element": element}},
+            {"$unwind": "$materials"},
+            {"$match": {"materials.material": material}},
+            {"$unwind": "$materials.pre_cor"}, 
+            {"$match": {
+                "materials.pre_cor.precursor": precursor,
+                "materials.pre_cor.coreactant": coreactant
+            }},
+            {"$unwind": "$materials.pre_cor.conditions"},
+            {"$match": {
+                "materials.pre_cor.conditions.surface": surface,
+                "materials.pre_cor.conditions.pretreatment": pretreatment
+            }},
+            {"$unwind": "$materials.pre_cor.conditions.publications"},
+            {"$match": {
+                "materials.pre_cor.conditions.publications.publication.author": publication["author"],
+                "materials.pre_cor.conditions.publications.publication.doi": publication["doi"]
+            }},
+            {"$project": {
+                "readings": "$materials.pre_cor.conditions.publications.readings"
+            }}
         ]
-        
+
+        result = list(collection.aggregate(pipeline))
+
+        if not result:
+            return jsonify([])
+
+        readings = result[0].get('readings', [])
         return jsonify(readings)
-        
+
     except Exception as e:
-        print(f"Error fetching readings: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": str(e)}), 500
     
 @app.route("/api/element-data", methods=["GET"])
 def get_element_data():
@@ -453,4 +548,4 @@ def get_element_data():
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(port=5001, debug=True)

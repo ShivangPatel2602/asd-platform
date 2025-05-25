@@ -31,15 +31,15 @@ function App() {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
-
-          const authResponse = await fetch(
-            `${config.BACKEND_API_URL}/api/check-authorization?email=${userData.email}`,
-            { credentials: "include" }
-          );
-          if (authResponse.ok) {
-            const { isAuthorized: authStatus } = await authResponse.json();
-            setIsAuthorized(authStatus);
-          }
+          setIsAuthorized(userData.isAuthorized)
+          // const authResponse = await fetch(
+          //   `${config.BACKEND_API_URL}/api/check-authorization?email=${userData.email}`,
+          //   { credentials: "include" }
+          // );
+          // if (authResponse.ok) {
+          //   const { isAuthorized: authStatus } = await authResponse.json();
+          //   setIsAuthorized(authStatus);
+          // }
         } else {
           setUser(null);
           setIsAuthorized(false);
@@ -71,19 +71,19 @@ function App() {
         />
         <Route path="/dashboard" element={
           user ?
-          <LandingPage setUser={setUser} user={user} /> :
+          <LandingPage setUser={setUser} isAuthorized={isAuthorized} /> :
           <Navigate to="/" />
           }
         />
         <Route path="/comparison" element={
           user ?
-          <MaterialSelector setUser={setUser} /> :
+          <MaterialSelector setUser={setUser} isAuthorized={isAuthorized} /> :
           <Navigate to="/" />
           }
         />
         <Route path="/upload-data" element={
           user ?
-          <FormInput setUser={setUser} user={user} /> :
+          <FormInput setUser={setUser} user={user} isAuthorized={isAuthorized}/> :
           <Navigate to="/" />
           } 
         />
@@ -96,7 +96,7 @@ function App() {
           path='/review-submissions'
           element={
             user && isAuthorized ?
-            <SubmissionReview setUser={setUser} /> :
+            <SubmissionReview setUser={setUser} isAuthorized={isAuthorized} /> :
             <Navigate to="/" />
           }
         />
