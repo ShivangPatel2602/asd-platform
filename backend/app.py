@@ -14,7 +14,10 @@ CORS(
     app, 
     resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000"],
+            "origins": [
+                "http://localhost:3000",
+                "https://asd-platform-frontend.onrender.com/"        
+            ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
             "expose_headers": ["Content-Range", "X-Content-Range"],
