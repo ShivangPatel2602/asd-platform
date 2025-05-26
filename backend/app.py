@@ -16,7 +16,7 @@ CORS(
         r"/api/*": {
             "origins": [
                 "http://localhost:3000",
-                "https://asd-platform-frontend.onrender.com/"        
+                "https://asd-platform-frontend.onrender.com"        
             ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "Accept", "Origin"],
@@ -51,7 +51,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='None',
-    SESSION_COOKIE_DOMAIN=None,
+    SESSION_COOKIE_DOMAIN='https://asd-platform-frontend.onrender.com',
     PERMANENT_SESSION_LIFETIME=timedelta(days=7)
 )
 
