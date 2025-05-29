@@ -210,7 +210,11 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     return (
       <div className="publications-list">
         {publications.map((pub, pubIndex) => (
-          <div key={pubIndex} className="publication-entry">
+          <div
+            key={pubIndex}
+            className="publication-entry"
+            data-pub-index={pubIndex}
+          >
             <span
               className={`publication-tag ${
                 selectedPublications[index]?.author === pub.author
@@ -219,18 +223,33 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
               }`}
               onClick={() => onSelect(index, pub)}
             >
+              <span className="publication-index">{pubIndex + 1}</span>
               {pub.author}
             </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const DOICell = ({ publications }) => {
+    return (
+      <div className="doi-list">
+        {publications.map((pub, pubIndex) => (
+          <div key={pubIndex} className="doi-entry" data-pub-index={pubIndex}>
             {pub.doi && (
-              <span
-                className="doi-link"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDOIClick(pub.doi);
-                }}
-                title="View publication"
-              >
-                📄
+              <span className="doi-wrapper">
+                <span className="doi-index">{pubIndex + 1}.</span>
+                <span
+                  className="doi-link"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDOIClick(pub.doi);
+                  }}
+                  title={`View publication: ${pub.author} (${pub.doi})`}
+                >
+                  {pub.doi} 📄
+                </span>
               </span>
             )}
           </div>
@@ -454,6 +473,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                     <th>Pretreatment</th>
                     <th>Surface</th>
                     <th>Publications</th>
+                    <th>DOI</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -483,6 +503,9 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                           index={index}
                           onSelect={handlePublicationSelect}
                         />
+                      </td>
+                      <td>
+                        <DOICell publications={row.publications} />
                       </td>
                     </tr>
                   ))}
