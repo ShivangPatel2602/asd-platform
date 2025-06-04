@@ -1,12 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { periodicTableElements, categories } from './elements';
 import './PeriodicTable.css';
+import config from "../../config";
 
 const PeriodicTable = () => {
     const [hoveredElement, setHoveredElement] = useState(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [elementsWithData, setElementsWithData] = useState(new Set());
     const navigate = useNavigate();
+
+    useEffect(() => {
+        fetch(`${config.BACKEND_API_URL}/api/elements-with-data`)
+            .then(res => res.json())
+            .then(data => {
+                setElementsWithData(new Set(data));
+            })
+            .catch(err => console.error('Error fetching elements data:', err));
+    }, []);
 
     const handleElementClick = (symbol) => {
         navigate(`/comparison?element=${symbol}`);
@@ -21,10 +32,12 @@ const PeriodicTable = () => {
         const element = periodicTableElements[position];
         if (!element) return <div className="element empty" />;
 
+        const hasData = elementsWithData.has(element.symbol);
+
         return (
             <button
                 key={position}
-                className={`element ${element.category}`}
+                className={`element ${element.category} ${hasData ? 'has-data' : 'no-data'}`}
                 onClick={() => handleElementClick(element.symbol)}
                 onMouseEnter={(e) => handleMouseEnter(element, e)}
                 onMouseLeave={() => setHoveredElement(null)}
@@ -32,6 +45,7 @@ const PeriodicTable = () => {
                 <span className="atomic-number">{element.number}</span>
                 <span className="symbol">{element.symbol}</span>
                 <span className="name">{element.name}</span>
+                {hasData && <span className="data-indicator">•</span>}
             </button>
         );
     };
@@ -120,6 +134,11 @@ const PeriodicTable = () => {
                     <h3>{hoveredElement.name}</h3>
                     <p>Atomic Number: {hoveredElement.number}</p>
                     <p>Category: {hoveredElement.category.replace('-', ' ')}</p>
+                    <div className={`data-status ${elementsWithData.has(hoveredElement.symbol) ? 'has-data' : 'no-data'}`}>
+                        {elementsWithData.has(hoveredElement.symbol) 
+                            ? '✓ Data Available' 
+                            : '○ No Data Available'}
+                    </div>
                 </div>
             )}
 
@@ -135,6 +154,18 @@ const PeriodicTable = () => {
                         </span>
                     </div>
                 ))}
+                <div className="data-availability-legend">
+                    <div className="legend-item">
+                        <div className="element-sample has-data">
+                            <span className="data-indicator">•</span>
+                        </div>
+                        <span>Data Available</span>
+                    </div>
+                    <div className="legend-item">
+                        <div className="element-sample no-data"></div>
+                        <span>No Data</span>
+                    </div>
+                </div>
             </div>
         </div>
     );

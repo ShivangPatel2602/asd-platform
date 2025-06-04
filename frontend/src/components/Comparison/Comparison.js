@@ -59,24 +59,38 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
 
   const handlePublicationSelect = (rowIndex, publication) => {
     setSelectedPublications((prev) => {
-      const isAlreadySelected = prev[rowIndex]?.author === publication.author;
+      const currentRowSelections = prev[rowIndex] || [];
+      const isAlreadySelected = currentRowSelections.some(
+        (pub) => pub.author === publication.author
+      );
 
       if (isAlreadySelected) {
-        const { [rowIndex]: _, ...rest } = prev;
-        return rest;
-      }
+        const updatedRowSelections = currentRowSelections.filter(
+          (pub) => pub.author !== publication.author
+        );
 
-      return {
-        ...prev,
-        [rowIndex]: publication,
-      };
+        return {
+          ...prev,
+          [rowIndex]: updatedRowSelections.length
+            ? updatedRowSelections
+            : undefined,
+        };
+      } else {
+        const updatedRowSelections = [
+          ...(currentRowSelections || []),
+          publication,
+        ].slice(-2);
+
+        return {
+          ...prev,
+          [rowIndex]: updatedRowSelections,
+        };
+      }
     });
 
-    if (selectedPublications[rowIndex]?.author !== publication.author) {
-      const row = elementData[rowIndex];
-      const compositeKey = `${rowIndex}-${publication.author}`;
-      fetchDataForRow(row, publication, compositeKey);
-    }
+    const row = elementData[rowIndex];
+    const compositeKey = `${rowIndex}-${publication.author}`;
+    fetchDataForRow(row, publication, compositeKey);
   };
 
   const fetchDataForRow = (row, publication, compositeKey) => {
@@ -207,6 +221,8 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   };
 
   const PublicationCell = ({ publications, index, onSelect }) => {
+    const currentSelections = selectedPublications[index] || [];
+
     return (
       <div className="publications-list">
         {publications.map((pub, pubIndex) => (
@@ -217,7 +233,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           >
             <span
               className={`publication-tag ${
-                selectedPublications[index]?.author === pub.author
+                currentSelections.some((p) => p.author === pub.author)
                   ? "selected"
                   : ""
               }`}
@@ -301,46 +317,81 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     const minCycle = Math.min(...allReadings.map((r) => r.cycles));
     const step = maxCycle <= 100 ? 5 : 10;
 
-    const uniformCycles = Array.from(
-      { length: Math.floor((maxCycle - minCycle) / step) + 1 },
-      (_, i) => minCycle + i * step
-    );
+    // Create linear interpolation function
+    const linearInterpolate = (x, x1, y1, x2, y2) => {
+      return y1 + ((x - x1) * (y2 - y1)) / (x2 - x1);
+    };
 
     const interpolateValue = (cycle, readings) => {
-      const before = [...readings].reverse().find((r) => r.cycles <= cycle);
-      const after = readings.find((r) => r.cycles >= cycle);
+      // Sort readings by cycle number
+      const sortedReadings = [...readings].sort((a, b) => a.cycles - b.cycles);
 
+      // Find the two points to interpolate between
+      const before = sortedReadings.reduce(
+        (prev, curr) => (curr.cycles <= cycle ? curr : prev),
+        null
+      );
+      const after = sortedReadings.find((r) => r.cycles >= cycle);
+
+      // Exact match
       if (before?.cycles === cycle) return before.thickness;
       if (after?.cycles === cycle) return after.thickness;
 
+      // Only interpolate between actual data points
       if (before && after) {
-        const ratio = (cycle - before.cycles) / (after.cycles - before.cycles);
-        return before.thickness + ratio * (after.thickness - before.thickness);
+        return linearInterpolate(
+          cycle,
+          before.cycles,
+          before.thickness,
+          after.cycles,
+          after.thickness
+        );
       }
 
       return null;
     };
 
-    return uniformCycles
-      .map((cycle) => {
-        const point = { cycle };
-        Object.entries(readings).forEach(([compositeKey, rowReadings]) => {
-          if (Array.isArray(rowReadings) && rowReadings.length > 0) {
-            const minDataCycle = Math.min(...rowReadings.map((r) => r.cycles));
-            const maxDataCycle = Math.max(...rowReadings.map((r) => r.cycles));
+    return Object.entries(readings)
+      .reduce((result, [compositeKey, rowReadings]) => {
+        if (!Array.isArray(rowReadings) || rowReadings.length === 0)
+          return result;
 
-            if (cycle >= minDataCycle && cycle <= maxDataCycle) {
-              point[compositeKey] = interpolateValue(cycle, rowReadings);
-            } else {
-              point[compositeKey] = null;
-            }
+        // Sort readings by cycle number
+        const sortedReadings = [...rowReadings].sort(
+          (a, b) => a.cycles - b.cycles
+        );
+
+        // Only interpolate between first and last actual data points
+        const firstCycle = sortedReadings[0].cycles;
+        const lastCycle = sortedReadings[sortedReadings.length - 1].cycles;
+
+        // Create points only within the actual data range
+        const cycles = Array.from(
+          { length: Math.floor((lastCycle - firstCycle) / step) + 1 },
+          (_, i) => firstCycle + i * step
+        ).filter((cycle) => cycle <= lastCycle);
+
+        // Add all actual data points to ensure they're plotted
+        const actualCycles = new Set(sortedReadings.map((r) => r.cycles));
+        cycles.push(...actualCycles);
+
+        // Sort unique cycles
+        const uniqueCycles = [...new Set(cycles)].sort((a, b) => a - b);
+
+        // Create data points
+        uniqueCycles.forEach((cycle) => {
+          const existingPoint = result.find((p) => p.cycle === cycle) || {
+            cycle,
+          };
+          existingPoint[compositeKey] = interpolateValue(cycle, rowReadings);
+          if (!result.find((p) => p.cycle === cycle)) {
+            result.push(existingPoint);
           }
         });
-        return point;
-      })
-      .filter((point) =>
-        Object.keys(point).some((key) => key !== "cycle" && point[key] !== null)
-      );
+
+        return result;
+      }, [])
+      .sort((a, b) => a.cycle - b.cycle);
   };
 
   const renderLines = () => {

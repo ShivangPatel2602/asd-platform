@@ -189,6 +189,15 @@ def check_authorization():
     is_authorized = authorized_users.find_one({"email": email})
     return jsonify({"isAuthorized": bool(is_authorized)})
 
+@app.route("/api/elements-with-data", methods=["GET"])
+def get_elements_with_data():
+    try:
+        elements = collection.distinct("element")
+        return jsonify(elements)
+    except Exception as e:
+        print(f"Error getting elements with data: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
 @app.route("/api/pending-submissions", methods=["GET"])
 def get_pending_submissions():
     user = session.get('user')

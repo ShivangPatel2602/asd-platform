@@ -1,78 +1,94 @@
 .periodic-table-container {
     padding: 20px;
-    background: #f5f5f5;
-    border-radius: 8px;
-    margin-top: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 .periodic-table {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
+    gap: 4px;
 }
 
 .row {
-    display: grid;
-    grid-template-columns: repeat(18, 1fr);
-    gap: 3px;
+    display: flex;
+    gap: 4px;
+    justify-content: flex-start;
 }
 
 .element {
-    aspect-ratio: 1;
-    padding: 4px;
-    border: none;
+    width: 64px;
+    height: 64px;
+    border: 1px solid #ccc;
     border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     position: relative;
-    background-color: white;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: pointer;
+    padding: 4px;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.element.empty {
+    border: none;
+    cursor: default;
+}
+
+.element.has-data {
+    border: 2px solid #2563eb;
+}
+
+.element.no-data {
+    opacity: 0.7;
 }
 
 .element:hover {
+    z-index: 1;
+}
+
+.element.has-data:hover {
     transform: scale(1.2);
     z-index: 10;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.element.no-data:hover {
+    transform: scale(1.1);
+    opacity: 0.9;
 }
 
 .atomic-number {
+    font-size: 0.7em;
     position: absolute;
     top: 2px;
     left: 4px;
-    font-size: 0.7em;
-    color: #666;
 }
 
 .symbol {
     font-size: 1.2em;
     font-weight: bold;
-    color: #333;
+    margin-bottom: 2px;
 }
 
 .name {
     font-size: 0.6em;
-    color: #666;
     text-align: center;
-    margin-top: 2px;
+    line-height: 1;
 }
 
 .element-spacer-first {
-    grid-column: span 16;
+    width: calc(64px * 16 + 4px * 15);
 }
 
 .element-spacer {
-    grid-column: span 10;
+    width: calc(64px * 10 + 4px * 9);
 }
 
 .element-spacer.small {
-    grid-column: span 3;
+    width: calc(64px * 3 + 4px * 2);
 }
 
 .spacer {
@@ -81,9 +97,10 @@
 
 .lanthanides,
 .actinides {
-    margin-left: 50px;
+    margin-top: 4px;
 }
 
+/* Element Categories */
 .alkali-metal { background-color: #ff6666; }
 .alkaline-earth { background-color: #ffdead; }
 .transition-metal { background-color: #ffc0c0; }
@@ -95,24 +112,54 @@
 .lanthanoid { background-color: #ffbfff; }
 .actinoid { background-color: #ff99cc; }
 
+/* Tooltip Styles */
 .element-tooltip {
     position: fixed;
     background: white;
-    padding: 8px 12px;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    z-index: 100;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 200px;
     pointer-events: none;
 }
 
-.category-legend {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 10px;
-    margin-top: 20px;
-    padding: 10px;
-    background: white;
+.element-tooltip h3 {
+    margin: 0 0 8px 0;
+    color: #1a1a1a;
+}
+
+.element-tooltip p {
+    margin: 4px 0;
+    color: #4b5563;
+}
+
+.element-tooltip .data-status {
+    margin-top: 8px;
+    padding: 4px 8px;
     border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.element-tooltip .data-status.has-data {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.element-tooltip .data-status.no-data {
+    background-color: #f3f4f6;
+    color: #6b7280;
+}
+
+/* Legend Styles */
+.category-legend {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    background: #f9fafb;
+    border-radius: 8px;
 }
 
 .legend-item {
@@ -122,37 +169,51 @@
 }
 
 .color-box {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     border-radius: 4px;
+    border: 1px solid #e5e7eb;
 }
 
 .category-name {
     font-size: 0.8em;
-    color: #333;
+    color: #1f2937;
 }
 
-/* Responsive design */
-@media (max-width: 1200px) {
-    .element .name {
-        display: none;
-    }
+.data-availability-legend {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 20px;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid #e5e7eb;
 }
 
-@media (max-width: 768px) {
-    .periodic-table-container {
-        padding: 10px;
-    }
-    
-    .element {
-        padding: 2px;
-    }
-    
-    .atomic-number {
-        font-size: 0.6em;
-    }
-    
-    .symbol {
-        font-size: 0.9em;
-    }
+.element-sample {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    background: white;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.element-sample.has-data {
+    border: 2px solid #2563eb;
+}
+
+.element-sample.no-data {
+    opacity: 0.7;
+    border: 1px solid #ccc;
+}
+
+.data-indicator {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    color: #2563eb;
+    font-size: 1.2em;
+    font-weight: bold;
 }
