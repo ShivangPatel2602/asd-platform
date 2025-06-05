@@ -132,6 +132,83 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   };
 
   const getMergedRows = (data) => {
+    // First, create groups based on material -> precursor -> coreactant -> pretreatment hierarchy
+    const groupAndSort = (rows) => {
+      const groups = {};
+
+      // Group by material
+      rows.forEach((row) => {
+        if (!groups[row.material]) {
+          groups[row.material] = {};
+        }
+
+        if (!groups[row.material][row.precursor]) {
+          groups[row.material][row.precursor] = {};
+        }
+
+        if (!groups[row.material][row.precursor][row.coreactant]) {
+          groups[row.material][row.precursor][row.coreactant] = {};
+        }
+
+        if (
+          !groups[row.material][row.precursor][row.coreactant][row.pretreatment]
+        ) {
+          groups[row.material][row.precursor][row.coreactant][
+            row.pretreatment
+          ] = [];
+        }
+
+        groups[row.material][row.precursor][row.coreactant][
+          row.pretreatment
+        ].push(row);
+      });
+
+      return groups;
+    };
+
+    // Convert nested groups back to flat array with optimal ordering
+    const flattenGroups = (groups) => {
+      const result = [];
+
+      Object.entries(groups).forEach(([material, precursors]) => {
+        Object.entries(precursors).forEach(([precursor, coreactants]) => {
+          Object.entries(coreactants).forEach(([coreactant, pretreatments]) => {
+            // Sort pretreatments to maximize merging
+            const pretreatmentGroups = {};
+            Object.entries(pretreatments).forEach(([pretreatment, rows]) => {
+              if (!pretreatmentGroups[pretreatment]) {
+                pretreatmentGroups[pretreatment] = [];
+              }
+              pretreatmentGroups[pretreatment].push(...rows);
+            });
+
+            // Convert pretreatment groups to array and sort for optimal merging
+            const sortedPretreatments = Object.entries(pretreatmentGroups).sort(
+              ([a], [b]) => {
+                // Sort by group size (descending) then alphabetically
+                const sizeA = pretreatmentGroups[a].length;
+                const sizeB = pretreatmentGroups[b].length;
+                if (sizeB !== sizeA) return sizeB - sizeA;
+                return a.localeCompare(b);
+              }
+            );
+
+            // Add rows to result maintaining the hierarchy
+            sortedPretreatments.forEach(([_, rows]) => {
+              result.push(...rows);
+            });
+          });
+        });
+      });
+
+      return result;
+    };
+
+    // Reorder the data for optimal merging
+    const groupedData = groupAndSort(data);
+    const orderedData = flattenGroups(groupedData);
+
+    // Calculate spans for the reordered data
     const mergedData = [];
     let currentRowSpans = {
       material: 1,
@@ -140,14 +217,15 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       pretreatment: 1,
     };
     let previousValues = {
-      material: data[0].material,
-      precursor: data[0].precursor,
-      coreactant: data[0].coreactant,
-      pretreatment: data[0].pretreatment,
+      material: orderedData[0].material,
+      precursor: orderedData[0].precursor,
+      coreactant: orderedData[0].coreactant,
+      pretreatment: orderedData[0].pretreatment,
     };
 
+    // Add first row
     mergedData.push({
-      ...data[0],
+      ...orderedData[0],
       spans: {
         material: 1,
         precursor: 1,
@@ -156,11 +234,12 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       },
     });
 
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
+    // Process remaining rows
+    for (let i = 1; i < orderedData.length; i++) {
+      const row = orderedData[i];
       const newRow = { ...row, spans: {} };
 
-      // Check material
+      // Calculate spans while maintaining hierarchy
       if (row.material === previousValues.material) {
         mergedData[mergedData.length - currentRowSpans.material].spans
           .material++;
@@ -170,9 +249,12 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         newRow.spans.material = 1;
         currentRowSpans.material = 1;
         previousValues.material = row.material;
+        // Reset dependent spans
+        currentRowSpans.precursor = 1;
+        currentRowSpans.coreactant = 1;
+        currentRowSpans.pretreatment = 1;
       }
 
-      // Check precursor (only if material is same)
       if (
         row.precursor === previousValues.precursor &&
         newRow.spans.material === 0
@@ -185,9 +267,11 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         newRow.spans.precursor = 1;
         currentRowSpans.precursor = 1;
         previousValues.precursor = row.precursor;
+        // Reset dependent spans
+        currentRowSpans.coreactant = 1;
+        currentRowSpans.pretreatment = 1;
       }
 
-      // Check coreactant (only if precursor is same)
       if (
         row.coreactant === previousValues.coreactant &&
         newRow.spans.precursor === 0
@@ -200,9 +284,10 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         newRow.spans.coreactant = 1;
         currentRowSpans.coreactant = 1;
         previousValues.coreactant = row.coreactant;
+        // Reset dependent spans
+        currentRowSpans.pretreatment = 1;
       }
 
-      // Check pretreatment (only if coreactant is same)
       if (
         row.pretreatment === previousValues.pretreatment &&
         newRow.spans.coreactant === 0
@@ -483,9 +568,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                 </thead>
                 <tbody>
                   {getMergedRows(elementData).map((row, index) => (
-                    <tr
-                      key={index}
-                    >
+                    <tr key={index}>
                       {row.spans.material > 0 && (
                         <td rowSpan={row.spans.material}>{row.material}</td>
                       )}
