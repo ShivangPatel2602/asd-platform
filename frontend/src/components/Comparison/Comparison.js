@@ -17,7 +17,6 @@ import {
 const MaterialSelector = ({ setUser, isAuthorized }) => {
   const [element, setElement] = useState("");
   const [elementData, setElementData] = useState([]);
-  const [selectedRows, setSelectedRows] = useState([]);
   const [selectedPublications, setSelectedPublications] = useState({});
   const [showChart, setShowChart] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +68,17 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           (pub) => pub.author !== publication.author
         );
 
+        setReadings((prevReadings) => {
+          const newReadings = { ...prevReadings };
+          delete newReadings[`${rowIndex}-${publication.author}`];
+
+          if (Object.keys(newReadings).length === 0) {
+            setShowChart(false);
+          }
+
+          return newReadings;
+        });
+
         return {
           ...prev,
           [rowIndex]: updatedRowSelections.length
@@ -81,16 +91,16 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           publication,
         ].slice(-2);
 
+        const row = elementData[rowIndex];
+        const compositeKey = `${rowIndex}-${publication.author}`;
+        fetchDataForRow(row, publication, compositeKey);
+
         return {
           ...prev,
           [rowIndex]: updatedRowSelections,
         };
       }
     });
-
-    const row = elementData[rowIndex];
-    const compositeKey = `${rowIndex}-${publication.author}`;
-    fetchDataForRow(row, publication, compositeKey);
   };
 
   const fetchDataForRow = (row, publication, compositeKey) => {
@@ -253,9 +263,9 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       <div className="doi-list">
         {publications.map((pub, pubIndex) => (
           <div key={pubIndex} className="doi-entry" data-pub-index={pubIndex}>
-            {pub.doi && (
-              <span className="doi-wrapper">
-                <span className="doi-index">{pubIndex + 1}.</span>
+            <span className="doi-wrapper">
+              <span className="doi-index">{pubIndex + 1}.</span>
+              {pub.doi ? (
                 <span
                   className="doi-link"
                   onClick={(e) => {
@@ -266,8 +276,10 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                 >
                   {pub.doi} 📄
                 </span>
-              </span>
-            )}
+              ) : (
+                <span className="doi-not-available">Not uploaded</span>
+              )}
+            </span>
           </div>
         ))}
       </div>
@@ -275,7 +287,6 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   };
 
   const handleClearSelections = () => {
-    setSelectedRows([]);
     setSelectedPublications({});
     setReadings({});
     setShowChart(false);
@@ -312,79 +323,23 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   const combinedData = () => {
     if (Object.keys(readings).length === 0) return [];
 
-    const allReadings = Object.values(readings).flat();
-    const maxCycle = Math.max(...allReadings.map((r) => r.cycles));
-    const minCycle = Math.min(...allReadings.map((r) => r.cycles));
-    const step = maxCycle <= 100 ? 5 : 10;
-
-    // Create linear interpolation function
-    const linearInterpolate = (x, x1, y1, x2, y2) => {
-      return y1 + ((x - x1) * (y2 - y1)) / (x2 - x1);
-    };
-
-    const interpolateValue = (cycle, readings) => {
-      // Sort readings by cycle number
-      const sortedReadings = [...readings].sort((a, b) => a.cycles - b.cycles);
-
-      // Find the two points to interpolate between
-      const before = sortedReadings.reduce(
-        (prev, curr) => (curr.cycles <= cycle ? curr : prev),
-        null
-      );
-      const after = sortedReadings.find((r) => r.cycles >= cycle);
-
-      // Exact match
-      if (before?.cycles === cycle) return before.thickness;
-      if (after?.cycles === cycle) return after.thickness;
-
-      // Only interpolate between actual data points
-      if (before && after) {
-        return linearInterpolate(
-          cycle,
-          before.cycles,
-          before.thickness,
-          after.cycles,
-          after.thickness
-        );
-      }
-
-      return null;
-    };
-
     return Object.entries(readings)
       .reduce((result, [compositeKey, rowReadings]) => {
         if (!Array.isArray(rowReadings) || rowReadings.length === 0)
           return result;
 
-        // Sort readings by cycle number
         const sortedReadings = [...rowReadings].sort(
           (a, b) => a.cycles - b.cycles
         );
 
-        // Only interpolate between first and last actual data points
-        const firstCycle = sortedReadings[0].cycles;
-        const lastCycle = sortedReadings[sortedReadings.length - 1].cycles;
-
-        // Create points only within the actual data range
-        const cycles = Array.from(
-          { length: Math.floor((lastCycle - firstCycle) / step) + 1 },
-          (_, i) => firstCycle + i * step
-        ).filter((cycle) => cycle <= lastCycle);
-
-        // Add all actual data points to ensure they're plotted
-        const actualCycles = new Set(sortedReadings.map((r) => r.cycles));
-        cycles.push(...actualCycles);
-
-        // Sort unique cycles
-        const uniqueCycles = [...new Set(cycles)].sort((a, b) => a - b);
-
-        // Create data points
-        uniqueCycles.forEach((cycle) => {
-          const existingPoint = result.find((p) => p.cycle === cycle) || {
-            cycle,
+        sortedReadings.forEach((reading) => {
+          const existingPoint = result.find(
+            (p) => p.cycle === reading.cycles
+          ) || {
+            cycle: reading.cycles,
           };
-          existingPoint[compositeKey] = interpolateValue(cycle, rowReadings);
-          if (!result.find((p) => p.cycle === cycle)) {
+          existingPoint[compositeKey] = reading.thickness;
+          if (!result.find((p) => p.cycle === reading.cycles)) {
             result.push(existingPoint);
           }
         });
@@ -409,37 +364,36 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           "#FFBB28",
         ];
         const [rowIndex, authorName] = compositeKey.split("-");
-        const actualPoints = rowReadings.map((r) => r.cycles);
 
         return (
           <Line
             key={compositeKey}
-            type="monotone"
+            type="linear"
             dataKey={compositeKey}
             stroke={colors[i % colors.length]}
             name={`${elementData[rowIndex].surface} (${authorName})`}
-            dot={(props) => {
-              if (props.payload && actualPoints.includes(props.payload.cycle)) {
-                return (
-                  <circle
-                    cx={props.cx}
-                    cy={props.cy}
-                    r={8}
-                    fill={colors[i % colors.length]}
-                    stroke="#fff"
-                    strokeWidth={2}
-                  />
-                );
-              }
-              return null;
+            dot={{
+              r: 8,
+              fill: colors[i % colors.length],
+              stroke: "#fff",
+              strokeWidth: 2,
             }}
+            activeDot={false}
             connectNulls={true}
-            activeDot={{ r: 10, strokeWidth: 2 }}
             strokeWidth={4}
+            legendType="plainline"
+            isAnimationActive={false}
           />
         );
       })
       .filter(Boolean);
+  };
+
+  const chartStyles = {
+    // Hide the legend symbols that appear at the top
+    ".recharts-default-legend .recharts-legend-item-symbol": {
+      display: "none !important",
+    },
   };
 
   const calculateSelectivity = () => {
@@ -531,7 +485,6 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                   {getMergedRows(elementData).map((row, index) => (
                     <tr
                       key={index}
-                      className={selectedRows.includes(index) ? "selected" : ""}
                     >
                       {row.spans.material > 0 && (
                         <td rowSpan={row.spans.material}>{row.material}</td>
@@ -582,6 +535,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                       <LineChart
                         data={combinedData()}
                         margin={{ top: 20, right: 110, left: 20, bottom: 20 }}
+                        style={chartStyles}
                       >
                         <CartesianGrid
                           strokeDasharray="3 3"
@@ -638,12 +592,55 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                           )}
                         />
                         <Legend
-                          layout="vertical"
-                          align="right"
                           verticalAlign="middle"
+                          align="right"
+                          layout="vertical"
                           wrapperStyle={{
-                            fontSize: "16px",
-                            fontWeight: 600,
+                            paddingLeft: "20px",
+                            position: "absolute",
+                            right: 0,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            backgroundColor: "rgba(255, 255, 255, 0.8)",
+                            border: "1px solid #eee",
+                            borderRadius: "4px",
+                          }}
+                          content={({ payload }) => {
+                            if (!payload) return null;
+                            return (
+                              <div style={{ padding: "8px" }}>
+                                {payload.map((entry, index) => (
+                                  <div
+                                    key={index}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      marginBottom: "8px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: "40px",
+                                        height: "3px",
+                                        backgroundColor: entry.color,
+                                        marginRight: "8px",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        color: "#1f2937",
+                                        fontSize: "16px",
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {entry.value}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
                           }}
                         />
                         <Tooltip
