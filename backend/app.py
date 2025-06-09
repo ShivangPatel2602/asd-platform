@@ -303,8 +303,16 @@ def add_data_to_db(data, submitter):
     if isinstance(publication_data, str):
         publication_data = {
             "author": publication_data,
-            "doi": ""
+            "doi": "",
+            "journal": "",
+            "year": ""
         }
+    publication_data = {
+        "author": publication_data.get("author", ""),
+        "journal": publication_data.get("journal", ""),
+        "year": publication_data.get("year", ""),
+        "doi": publication_data.get("doi", "")
+    }
     readings = data.get("readings", [])
     
     if not element:
@@ -357,8 +365,9 @@ def add_data_to_db(data, submitter):
         
     pub_doc = next(
         (p for p in condition_doc.get("publications", [])
-         if p["publication"]["author"] == publication_data["author"] and 
-         p["publication"]["doi"] == publication_data["doi"]),
+         if (p["publication"]["author"] == publication_data["author"] and 
+             p["publication"]["journal"] == publication_data["journal"] and
+             p["publication"]["year"] == publication_data["year"])),
         None
     )
     
@@ -377,6 +386,92 @@ def add_data_to_db(data, submitter):
     collection.replace_one({"element": element}, element_doc, upsert=True)
     
     return jsonify({"message": "Data added successfully"}), 201
+
+@app.route("/api/update-data", methods=["PUT"])
+def update_data():
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    # is_authorized = authorized_users.find_one({"email": user.get("email")})
+    # if not is_authorized:
+    #     return jsonify({"error": "Not authorized"}), 403
+    
+    data = request.get_json()
+    original = data.get("original")
+    updated = data.get("updated")
+    
+    if not original or not updated:
+        return jsonify({"error": "Both original and updated data are required"}), 400
+    
+    try:
+        # Find and update the specific document
+        element_doc = collection.find_one({"element": original["element"]})
+        if not element_doc:
+            return jsonify({"error": "Element not found"}), 404
+            
+        # Update material
+        material_doc = next((m for m in element_doc["materials"] 
+                           if m["material"] == original["material"]), None)
+        if not material_doc:
+            return jsonify({"error": "Material not found"}), 404
+            
+        # Update pre_cor
+        pair_doc = next((p for p in material_doc["pre_cor"] 
+                        if p["precursor"] == original["precursor"] 
+                        and p["coreactant"] == original["coreactant"]), None)
+        if not pair_doc:
+            return jsonify({"error": "Precursor-coreactant pair not found"}), 404
+            
+        # Update condition
+        condition_doc = next((c for c in pair_doc["conditions"] 
+                            if c["surface"] == original["surface"]
+                            and c["pretreatment"] == original["pretreatment"]), None)
+        if not condition_doc:
+            return jsonify({"error": "Condition not found"}), 404
+            
+        # Update the condition with new data
+        condition_doc["surface"] = updated["surface"]
+        condition_doc["pretreatment"] = updated["pretreatment"]
+        
+        # Update publications and readings
+        for pub_index, pub in enumerate(updated["publications"]):
+            # Ensure publication has all required fields
+            publication_data = {
+                "author": pub.get("author", ""),
+                "journal": pub.get("journal", ""),
+                "year": pub.get("year", ""),
+                "doi": pub.get("doi", "")
+            }
+            
+            if pub_index < len(condition_doc["publications"]):
+                condition_doc["publications"][pub_index]["publication"] = publication_data
+                condition_doc["publications"][pub_index]["readings"] = (
+                    updated["readings"][pub_index]["readings"]
+                    if pub_index < len(updated["readings"]) else []
+                )
+            else:
+                condition_doc["publications"].append({
+                    "publication": publication_data,
+                    "readings": (
+                        updated["readings"][pub_index]["readings"]
+                        if pub_index < len(updated["readings"]) else []
+                    ),
+                    "submittedBy": {
+                        "email": user.get("email"),
+                        "name": user.get("name", "Unknown"),
+                        "submission_date": datetime.now()
+                    }
+                })
+        
+        # Save changes
+        collection.replace_one({"element": original["element"]}, element_doc)
+        
+        return jsonify({"message": "Data updated successfully"}), 200
+        
+    except Exception as e:
+        print(f"Error updating data: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 def notify_authorized_users(data, submitter):
     authorized_emails = [user["email"] for user in authorized_users.find()]

@@ -1,11 +1,17 @@
-import React, {useState, useEffect} from 'react';
-import { HashRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import config from './config';
-import LoginPage from './components/Login/LoginPage';
-import LandingPage from './components/LandingPage/LandingPage';
-import FormInput from './components/Form/FormInput';
-import MaterialSelector from './components/Comparison/Comparison';
-import SubmissionReview from './components/Submissions/Submission';
+import React, { useState, useEffect } from "react";
+import {
+  HashRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+} from "react-router-dom";
+import config from "./config";
+import LoginPage from "./components/Login/LoginPage";
+import LandingPage from "./components/LandingPage/LandingPage";
+import FormInput from "./components/Form/FormInput";
+import MaterialSelector from "./components/Comparison/Comparison";
+import SubmissionReview from "./components/Submissions/Submission";
+import EditData from "./components/EditData/EditData";
 import "./App.css";
 
 function App() {
@@ -20,9 +26,9 @@ function App() {
         const response = await fetch(`${config.BACKEND_API_URL}/api/user`, {
           credentials: "include",
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Origin': window.location.origin
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Origin: window.location.origin,
           },
         });
 
@@ -31,20 +37,12 @@ function App() {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
-          setIsAuthorized(userData.isAuthorized)
-          // const authResponse = await fetch(
-          //   `${config.BACKEND_API_URL}/api/check-authorization?email=${userData.email}`,
-          //   { credentials: "include" }
-          // );
-          // if (authResponse.ok) {
-          //   const { isAuthorized: authStatus } = await authResponse.json();
-          //   setIsAuthorized(authStatus);
-          // }
+          setIsAuthorized(userData.isAuthorized);
         } else {
           setUser(null);
           setIsAuthorized(false);
         }
-      } catch(error) {
+      } catch (error) {
         console.error("Error fetching user data:", error);
         if (mounted) {
           setUser(null);
@@ -63,43 +61,59 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={
-          !user ?  
-          <LoginPage /> :
-          <Navigate to="/dashboard" />
-          } 
+        <Route
+          path="/"
+          element={!user ? <LoginPage /> : <Navigate to="/dashboard" />}
         />
-        <Route path="/dashboard" element={
-          user ?
-          <LandingPage setUser={setUser} isAuthorized={isAuthorized} /> :
-          <Navigate to="/" />
-          }
-        />
-        <Route path="/comparison" element={
-          user ?
-          <MaterialSelector setUser={setUser} isAuthorized={isAuthorized} /> :
-          <Navigate to="/" />
-          }
-        />
-        <Route path="/upload-data" element={
-          user ?
-          <FormInput setUser={setUser} user={user} isAuthorized={isAuthorized}/> :
-          <Navigate to="/" />
-          } 
-        />
-        <Route 
-          path="*" element={
-            <Navigate to="/" />
-          }
-        />
-        <Route 
-          path='/review-submissions'
+        <Route
+          path="/dashboard"
           element={
-            user && isAuthorized ?
-            <SubmissionReview setUser={setUser} isAuthorized={isAuthorized} /> :
-            <Navigate to="/" />
+            user ? (
+              <LandingPage setUser={setUser} isAuthorized={isAuthorized} />
+            ) : (
+              <Navigate to="/" />
+            )
           }
         />
+        <Route
+          path="/comparison"
+          element={
+            user ? (
+              <MaterialSelector setUser={setUser} isAuthorized={isAuthorized} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/upload-data"
+          element={
+            user ? (
+              <FormInput
+                setUser={setUser}
+                user={user}
+                isAuthorized={isAuthorized}
+              />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/review-submissions"
+          element={
+            user && isAuthorized ? (
+              <SubmissionReview setUser={setUser} isAuthorized={isAuthorized} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/edit-data/:element"
+          element={<EditData setUser={setUser} isAuthorized={isAuthorized} />}
+        />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

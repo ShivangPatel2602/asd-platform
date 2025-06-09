@@ -103,6 +103,15 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     });
   };
 
+  const handleEditClick = (rowData) => {
+    navigate(`/edit-data/${element}`, {
+      state: {
+        rowData,
+        element,
+      },
+    });
+  };
+
   const fetchDataForRow = (row, publication, compositeKey) => {
     const queryParams = new URLSearchParams({
       element: element,
@@ -335,7 +344,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
               onClick={() => onSelect(index, pub)}
             >
               <span className="publication-index">{pubIndex + 1}</span>
-              {pub.author}
+              {`${pub.author}, ${pub.journal} ${pub.year}`}
             </span>
           </div>
         ))}
@@ -357,9 +366,9 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                     e.stopPropagation();
                     handleDOIClick(pub.doi);
                   }}
-                  title={`View publication: ${pub.author} (${pub.doi})`}
+                  title={`View publication: ${pub.doi}`}
                 >
-                  {pub.doi} 📄
+                  {`${pub.author}, ${pub.journal} ${pub.year}`}
                 </span>
               ) : (
                 <span className="doi-not-available">Not uploaded</span>
@@ -562,8 +571,9 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                     <th>Co-reactant</th>
                     <th>Pretreatment</th>
                     <th>Surface</th>
-                    <th>Publications</th>
-                    <th>DOI</th>
+                    <th>Dataset</th>
+                    <th>Publication</th>
+                    <th>Edit</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -593,6 +603,15 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                       </td>
                       <td>
                         <DOICell publications={row.publications} />
+                      </td>
+                      <td>
+                        <button
+                          className="edit-button"
+                          onClick={() => handleEditClick(row)}
+                          title="Edit this dataset"
+                        >
+                          <span>✏️</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
