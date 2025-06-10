@@ -90,8 +90,8 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           ...(currentRowSelections || []),
           publication,
         ].slice(-2);
-
-        const row = elementData[rowIndex];
+        const mergedRows = getMergedRows(elementData);
+        const row = mergedRows[rowIndex]; // Use mergedRows instead of elementData
         const compositeKey = `${rowIndex}-${publication.author}`;
         fetchDataForRow(row, publication, compositeKey);
 
@@ -113,6 +113,14 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   };
 
   const fetchDataForRow = (row, publication, compositeKey) => {
+    // Handle both old and new publication formats
+    const publicationData = {
+      author: publication.author,
+      journal: publication.journal || "", // Default empty for old format
+      year: publication.year || "", // Default empty for old format
+      doi: publication.doi || "",
+    };
+
     const queryParams = new URLSearchParams({
       element: element,
       material: row.material,
@@ -120,13 +128,25 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       coreactant: row.coreactant,
       surface: row.surface,
       pretreatment: row.pretreatment,
-      publication: JSON.stringify(publication),
+      temperature: row.temperature || "",
+      publication: JSON.stringify(publicationData),
     });
+
+    console.log(
+      "Fetching readings with params:",
+      Object.fromEntries(queryParams.entries())
+    );
 
     fetch(`${API_BASE_URL}/readings?${queryParams.toString()}`, {
       credentials: "include",
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "Failed to fetch readings");
+        }
+        return res.json();
+      })
       .then((data) => {
         setReadings((prev) => ({
           ...prev,
@@ -136,7 +156,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       })
       .catch((err) => {
         console.error("Error fetching readings:", err);
-        setError("Failed to fetch reading data");
+        setError(`Failed to fetch reading data: ${err.message}`);
       });
   };
 
@@ -444,20 +464,43 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   };
 
   const renderLines = () => {
+    const mergedRows = getMergedRows(elementData);
+    const colors = [
+      "#8884d8",
+      "#82ca9d",
+      "#ffc658",
+      "#ff7300",
+      "#00C49F",
+      "#FFBB28",
+    ];
+
     return Object.entries(readings)
       .map(([compositeKey, rowReadings], i) => {
         if (!Array.isArray(rowReadings) || rowReadings.length === 0)
           return null;
 
-        const colors = [
-          "#8884d8",
-          "#82ca9d",
-          "#ffc658",
-          "#ff7300",
-          "#00C49F",
-          "#FFBB28",
-        ];
-        const [rowIndex, authorName] = compositeKey.split("-");
+        const [originalIndex, authorName] = compositeKey.split("-");
+
+        // Find the correct row in mergedRows
+        const row = mergedRows.find((r, index) => {
+          const matchingPub = r.publications.find(
+            (p) => p.author === authorName
+          );
+          return matchingPub && index.toString() === originalIndex;
+        });
+
+        if (!row) return null;
+
+        // Find the matching publication
+        const publication = row.publications.find(
+          (pub) => pub.author === authorName
+        );
+        if (!publication) return null;
+
+        // Create display name based on available fields
+        const displayName = `${row.surface} (${publication.author}${
+          publication.journal ? `, ${publication.journal}` : ""
+        }${publication.year ? ` ${publication.year}` : ""})`;
 
         return (
           <Line
@@ -465,7 +508,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
             type="linear"
             dataKey={compositeKey}
             stroke={colors[i % colors.length]}
-            name={`${elementData[rowIndex].surface} (${authorName})`}
+            name={displayName}
             dot={{
               r: 8,
               fill: colors[i % colors.length],
@@ -483,24 +526,26 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       .filter(Boolean);
   };
 
-  const chartStyles = {
-    // Hide the legend symbols that appear at the top
-    ".recharts-default-legend .recharts-legend-item-symbol": {
-      display: "none !important",
-    },
-  };
-
   const calculateSelectivity = () => {
     const selectedReadings = Object.values(readings);
 
+    // Check if we have exactly 2 sets of readings
     if (selectedReadings.length !== 2) {
       setSelectivityData([]);
       return;
     }
 
+    // Ensure both data sets are arrays
     const [data1, data2] = selectedReadings;
+    if (!Array.isArray(data1) || !Array.isArray(data2)) {
+      console.error("Invalid data format for selectivity calculation");
+      setSelectivityData([]);
+      return;
+    }
+
     const selectivityPoints = [];
 
+    // Create Sets of cycles from both data sets
     const cycles1 = new Set(data1.map((r) => r.cycles));
     const cycles2 = new Set(data2.map((r) => r.cycles));
     const commonCycles = [...cycles1].filter((cycle) => cycles2.has(cycle));
@@ -637,7 +682,6 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                       <LineChart
                         data={combinedData()}
                         margin={{ top: 20, right: 110, left: 20, bottom: 20 }}
-                        style={chartStyles}
                       >
                         <CartesianGrid
                           strokeDasharray="3 3"

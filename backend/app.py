@@ -393,10 +393,6 @@ def update_data():
     if not user:
         return jsonify({"error": "Not authenticated"}), 401
     
-    # is_authorized = authorized_users.find_one({"email": user.get("email")})
-    # if not is_authorized:
-    #     return jsonify({"error": "Not authorized"}), 403
-    
     data = request.get_json()
     original = data.get("original")
     updated = data.get("updated")
@@ -578,7 +574,17 @@ def get_readings():
         coreactant = request.args.get('coreactant')
         surface = request.args.get('surface')
         pretreatment = request.args.get('pretreatment')
+        temperature = request.args.get('temperature')
         publication = json.loads(request.args.get('publication'))
+
+        match_conditions = {
+            "materials.pre_cor.conditions.publications.publication.author": publication["author"]
+        }
+        
+        if publication.get("journal"):
+            match_conditions["materials.pre_cor.conditions.publications.publication.journal"] = publication["journal"]
+        if publication.get("year"):
+            match_conditions["materials.pre_cor.conditions.publications.publication.year"] = publication["year"]
 
         pipeline = [
             {"$match": {"element": element}},
@@ -592,13 +598,11 @@ def get_readings():
             {"$unwind": "$materials.pre_cor.conditions"},
             {"$match": {
                 "materials.pre_cor.conditions.surface": surface,
-                "materials.pre_cor.conditions.pretreatment": pretreatment
+                "materials.pre_cor.conditions.pretreatment": pretreatment,
+                "materials.pre_cor.conditions.temperature": temperature
             }},
             {"$unwind": "$materials.pre_cor.conditions.publications"},
-            {"$match": {
-                "materials.pre_cor.conditions.publications.publication.author": publication["author"],
-                "materials.pre_cor.conditions.publications.publication.doi": publication["doi"]
-            }},
+            {"$match": match_conditions},
             {"$project": {
                 "readings": "$materials.pre_cor.conditions.publications.readings"
             }}
