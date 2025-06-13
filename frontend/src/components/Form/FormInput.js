@@ -9,6 +9,7 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
   const [form, setForm] = useState({
     element: "",
     material: "",
+    technique: "",
     precursor: "",
     coreactant: "",
     temperature: "",
@@ -36,6 +37,7 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
       fields: [
         { id: "element", label: "Element", icon: "⚛️" },
         { id: "material", label: "Material", icon: "🧪" },
+        { id: "technique", label: "Technique of Deposition", icon: "🔧" },
       ],
     },
     {

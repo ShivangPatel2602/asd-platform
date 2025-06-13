@@ -294,6 +294,7 @@ def add_data():
 def add_data_to_db(data, submitter):    
     element = data.get("element")
     material = data.get("material")
+    technique = data.get("technique", "")
     precursor = data.get("precursor")
     coreactant = data.get("coreactant")
     surface = data.get("surface")
@@ -331,6 +332,7 @@ def add_data_to_db(data, submitter):
     if not material_doc:
         material_doc = {
             "material": material,
+            "technique": technique,
             "pre_cor": []
         }
         element_doc["materials"].append(material_doc)
@@ -657,6 +659,164 @@ def get_element_data():
     except Exception as e:
         print(f"Error getting element data: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+    
+@app.route("/api/surfaces-with-data", methods=["GET"])
+def get_surfaces_with_data():
+    try:
+        # Aggregate to find all unique surface materials
+        pipeline = [
+            {"$unwind": "$materials"},
+            {"$unwind": "$materials.pre_cor"},
+            {"$unwind": "$materials.pre_cor.conditions"},
+            {
+                "$group": {
+                    "_id": {
+                        "$substr": [
+                            "$materials.pre_cor.conditions.surface",
+                            0,
+                            {"$indexOfBytes": ["$materials.pre_cor.conditions.surface", " "]}
+                        ]
+                    }
+                }
+            },
+            {"$project": {"_id": 0, "element": "$_id"}}
+        ]
+        
+        result = list(collection.aggregate(pipeline))
+        surface_elements = [doc["element"] for doc in result if doc["element"]]
+        return jsonify(surface_elements)
+    except Exception as e:
+        print(f"Error getting surface elements: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+    
+@app.route("/api/element-data-by-surface", methods=["GET"])
+def get_element_data_by_surface():
+    try:
+        surface_element = request.args.get("surface")
+        if not surface_element:
+            return jsonify({"error": "Surface parameter is required"}), 400
 
+        pipeline = [
+            {"$unwind": "$materials"},
+            {"$unwind": "$materials.pre_cor"},
+            {"$unwind": "$materials.pre_cor.conditions"},
+            {
+                "$match": {
+                    "$expr": {
+                        "$eq": [
+                            {
+                                "$substr": [
+                                    "$materials.pre_cor.conditions.surface",
+                                    0,
+                                    {"$strLenBytes": surface_element}
+                                ]
+                            },
+                            surface_element
+                        ]
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "element": "$element",
+                        "material": "$materials.material",
+                        "precursor": "$materials.pre_cor.precursor",
+                        "coreactant": "$materials.pre_cor.coreactant",
+                        "surface": "$materials.pre_cor.conditions.surface",
+                        "pretreatment": "$materials.pre_cor.conditions.pretreatment",
+                        "temperature": "$materials.pre_cor.conditions.temperature"
+                    },
+                    "publications": {
+                        "$push": "$materials.pre_cor.conditions.publications"
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "element": "$_id.element",
+                    "material": "$_id.material",
+                    "precursor": "$_id.precursor",
+                    "coreactant": "$_id.coreactant",
+                    "surface": "$_id.surface",
+                    "pretreatment": "$_id.pretreatment",
+                    "temperature": "$_id.temperature",
+                    "publications": {
+                        "$reduce": {
+                            "input": "$publications",
+                            "initialValue": [],
+                            "in": {"$concatArrays": ["$$value", "$$this"]}
+                        }
+                    }
+                }
+            }
+        ]
+
+        result = list(collection.aggregate(pipeline))
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error getting surface data: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+    
+@app.route("/api/delete-data", methods=["DELETE"])
+def delete_data():
+    try:
+        user = session.get('user')
+        if not user:
+            return jsonify({"error": "Not authenticated"}), 401
+        
+        # Fix authorization check
+        is_authorized = authorized_users.find_one({"emails": {"$in": [user.get("email")]}})
+        if not is_authorized:
+            return jsonify({"error": "Not authorized"}), 403
+
+        data = request.get_json()
+        element = data.get('element')
+        row_data = data.get('rowData')
+        delete_type = data.get('type')
+        publications = data.get('publications', [])
+
+        # Find the document
+        element_doc = collection.find_one({"element": element})
+        if not element_doc:
+            return jsonify({"error": "Element not found"}), 404
+
+        # For single publication row deletion
+        if delete_type == 'row' and len(row_data.get('publications', [])) == 1:
+            publications = row_data.get('publications', [])
+
+        # Rest of the delete logic...
+        if delete_type == 'row':
+            # Remove the entire condition
+            for material in element_doc['materials']:
+                if material['material'] == row_data['material']:
+                    for pair in material['pre_cor']:
+                        if (pair['precursor'] == row_data['precursor'] and 
+                            pair['coreactant'] == row_data['coreactant']):
+                            pair['conditions'] = [
+                                c for c in pair['conditions']
+                                if not (c['surface'] == row_data['surface'] and 
+                                      c['pretreatment'] == row_data['pretreatment'] and
+                                      c.get('temperature') == row_data.get('temperature'))
+                            ]
+
+        # Clean up empty structures
+        for material in element_doc['materials'][:]:
+            for pair in material['pre_cor'][:]:
+                pair['conditions'] = [c for c in pair['conditions'] if c['publications']]
+                if not pair['conditions']:
+                    material['pre_cor'].remove(pair)
+            if not material['pre_cor']:
+                element_doc['materials'].remove(material)
+
+        collection.replace_one({"element": element}, element_doc)
+        
+        return jsonify({"message": "Data deleted successfully"}), 200
+
+    except Exception as e:
+        print(f"Error deleting data: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == "__main__":
     app.run(port=5001, debug=True)

@@ -12,6 +12,8 @@ const EditData = ({ setUser, isAuthorized }) => {
   const [publications, setPublications] = useState([]);
   const [readings, setReadings] = useState([]);
   const [status, setStatus] = useState("");
+  const [cursorPositions, setCursorPositions] = useState({});
+  const [textareaContent, setTextareaContent] = useState({});
 
   useEffect(() => {
     if (!rowData) {
@@ -19,10 +21,10 @@ const EditData = ({ setUser, isAuthorized }) => {
       return;
     }
 
-    // Initialize form with existing data
     setFormData({
       element,
       material: rowData.material,
+      technique: rowData.technique || "",
       precursor: rowData.precursor,
       coreactant: rowData.coreactant,
       pretreatment: rowData.pretreatment,
@@ -32,7 +34,6 @@ const EditData = ({ setUser, isAuthorized }) => {
 
     setPublications(rowData.publications || []);
 
-    // Fetch readings for each publication
     const fetchReadings = async () => {
       const allReadings = [];
       for (const pub of rowData.publications) {
@@ -60,13 +61,64 @@ const EditData = ({ setUser, isAuthorized }) => {
     fetchReadings();
   }, [rowData, element, navigate]);
 
+  const processReadingsText = (text) => {
+    return text.split("\n").map((line) => {
+      const [cycles, thickness] = line.split(/\s+/);
+      return {
+        cycles: cycles === "0" ? 0 : cycles || "",
+        thickness: thickness === "0" ? 0 : thickness || "",
+      };
+    });
+  };
+
+  const handleReadingsChange = (index, value, cursorStart, cursorEnd) => {
+    // Immediately update textarea content to maintain cursor position
+    setTextareaContent((prev) => ({
+      ...prev,
+      [index]: value,
+    }));
+
+    // Process the readings but preserve empty lines
+    const parsedReadings = processReadingsText(value);
+
+    setReadings((prev) => {
+      const newReadings = [...prev];
+      newReadings[index] = {
+        publication: readings[index]?.publication || publications[index],
+        // Don't filter out empty readings during editing
+        readings: parsedReadings,
+      };
+      return newReadings;
+    });
+
+    // Store cursor position
+    setCursorPositions((prev) => ({
+      ...prev,
+      [index]: { start: cursorStart, end: cursorEnd },
+    }));
+  };
+
+  useEffect(() => {
+    if (readings.length > 0) {
+      const content = {};
+      readings.forEach((reading, index) => {
+        content[index] =
+          reading.readings
+            ?.map((r) => `${r.cycles} ${r.thickness}`)
+            ?.join("\n") || "";
+      });
+      setTextareaContent(content);
+    }
+  }, [readings]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Format the readings data correctly
       const formattedReadings = readings.map((reading) => ({
         publication: reading.publication,
-        readings: Array.isArray(reading.readings) ? reading.readings : [],
+        readings: reading.readings.filter(
+          (r) => r.cycles !== "" || r.thickness !== ""
+        ),
       }));
 
       const payload = {
@@ -80,8 +132,6 @@ const EditData = ({ setUser, isAuthorized }) => {
           readings: formattedReadings,
         },
       };
-
-      console.log("Sending update payload:", payload); // Debug log
 
       const response = await fetch(
         `${config.BACKEND_API_URL}/api/update-data`,
@@ -118,7 +168,6 @@ const EditData = ({ setUser, isAuthorized }) => {
       <div className="edit-data-container">
         <h2>Edit Dataset</h2>
         <form onSubmit={handleSubmit}>
-          {/* Basic Information */}
           <section className="edit-section">
             <h3>Basic Information</h3>
             <div className="form-grid">
@@ -205,27 +254,47 @@ const EditData = ({ setUser, isAuthorized }) => {
                 <div className="readings-edit">
                   <h4>Readings</h4>
                   <textarea
-                    value={readings[index]?.readings
-                      .map((r) => `${r.cycles} ${r.thickness}`)
-                      .join("\n")}
+                    value={textareaContent[index] || ""}
                     onChange={(e) => {
-                      const newReadings = [...readings];
-                      const parsedReadings = e.target.value
-                        .split("\n")
-                        .map((line) => {
-                          const [cycles, thickness] = line.trim().split(/\s+/);
-                          return {
-                            cycles: parseFloat(cycles),
-                            thickness: parseFloat(thickness),
-                          };
-                        })
-                        .filter((r) => !isNaN(r.cycles) && !isNaN(r.thickness));
+                      const cursorStart = e.target.selectionStart;
+                      const cursorEnd = e.target.selectionEnd;
+                      handleReadingsChange(
+                        index,
+                        e.target.value,
+                        cursorStart,
+                        cursorEnd
+                      );
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") return;
 
-                      newReadings[index] = {
-                        publication: pub,
-                        readings: parsedReadings,
-                      };
-                      setReadings(newReadings);
+                      const allowedKeys = [
+                        "Backspace",
+                        "Delete",
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "ArrowUp",
+                        "ArrowDown",
+                        "Tab",
+                        " ",
+                        ".",
+                      ];
+                      const isNumber = /^[0-9]$/;
+
+                      if (
+                        !isNumber.test(e.key) &&
+                        !allowedKeys.includes(e.key)
+                      ) {
+                        e.preventDefault();
+                      }
+                    }}
+                    ref={(element) => {
+                      if (element && cursorPositions[index]) {
+                        element.setSelectionRange(
+                          cursorPositions[index].start,
+                          cursorPositions[index].end
+                        );
+                      }
                     }}
                     rows={10}
                     placeholder="Format: cycle thickness&#10;Example:&#10;0 0&#10;10 0.5"

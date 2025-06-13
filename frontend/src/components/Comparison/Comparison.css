@@ -7,7 +7,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 table {
@@ -25,10 +25,10 @@ td {
 }
 
 th:nth-child(1) {
-  width: 12%;
+  width: 10%;
 }
 th:nth-child(2) {
-  width: 12%;
+  width: 10%;
 }
 th:nth-child(3) {
   width: 12%;
@@ -40,13 +40,16 @@ th:nth-child(5) {
   width: 10%;
 }
 th:nth-child(6) {
-  width: 19%;
+  width: 12%;
 }
 th:nth-child(7) {
-  width: 19%;
+  width: 17%;
 }
 th:nth-child(8) {
-  width: 6%;
+  width: 10%;
+}
+th:nth-child(9) {
+  width: 10%;
 }
 
 th {
@@ -61,12 +64,10 @@ table td[rowspan] {
   transition: background-color 0.2s ease;
 }
 
-table td[rowspan]:hover {
-  background-color: #f1f5f9;
-}
-
-tr:hover td[rowspan] {
-  background-color: #f1f5f9;
+td:last-child {
+  padding: 8px 12px;
+  min-width: 100px;
+  white-space: nowrap; 
 }
 
 .publications-list {
@@ -114,7 +115,7 @@ tr:hover td[rowspan] {
 .charts-wrapper {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 40px;
   margin: 20px auto;
   max-width: 1800px;
   padding: 0 20px;
@@ -127,6 +128,63 @@ tr:hover td[rowspan] {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
   width: 100%;
   min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-legend-container {
+  position: absolute;
+  top: 100%;          
+  left: 0;
+  right: 0;
+  margin-top: 16px; 
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid #eee;
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  z-index: 1;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.legend-line {
+  width: 40px;
+  height: 3px;
+  flex-shrink: 0;
+}
+
+.legend-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+  line-height: 0;
+}
+
+.legend-text sub {
+  font-size: 0.65em;
+}
+
+td sub {
+  font-weight: inherit;
 }
 
 .no-data-container {
@@ -396,23 +454,42 @@ tr:hover td[rowspan] {
   font-weight: 600;
 }
 
-.edit-button {
-  width: 100%;
+.action-buttons {
   display: flex;
-  justify-content: center;
+  gap: 4px;
+  justify-content: flex-start;
   align-items: center;
-  background: none;
-  border: none;
-  padding: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  min-width: 100px; /* Ensure minimum width */
+  padding: 2px;
 }
 
-.edit-button:hover {
+.edit-button,
+.delete-button,
+.delete-publications-button {
+  padding: 6px;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 0 0 auto; /* Prevent shrinking */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px; /* Ensure minimum button width */
+  height: 28px; /* Fixed height */
+}
+
+.edit-button:hover,
+.delete-button:hover,
+.delete-publications-button:hover {
   background: #f1f5f9;
   transform: scale(1.1);
 }
 
-.edit-button span {
+.edit-button span,
+.delete-button span,
+.delete-publications-button span {
   font-size: 1.2rem;
+  line-height: 1;
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
 import config from "../../config";
+import DeleteModal from "../DeleteModal/DeleteModal";
 import "./Comparison.css";
 import {
   LineChart,
@@ -23,6 +24,12 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [readings, setReadings] = useState({});
   const [selectivityData, setSelectivityData] = useState([]);
+  const [deleteModalConfig, setDeleteModalConfig] = useState({
+    isOpen: false,
+    type: null,
+    rowData: null,
+    publications: null,
+  });
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -32,6 +39,8 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const elementParam = params.get("element");
+    const surfaceParam = params.get("surface");
+
     if (elementParam) {
       setElement(elementParam);
       setIsLoading(true);
@@ -46,6 +55,25 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         })
         .catch((err) => {
           console.error("Error fetching materials:", err);
+          navigate("/dashboard");
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else if (surfaceParam) {
+      setElement(surfaceParam);
+      setIsLoading(true);
+      fetch(`${API_BASE_URL}/element-data-by-surface?surface=${surfaceParam}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.length === 0) {
+            setError("no-data");
+          } else {
+            setElementData(data);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching surface data:", err);
           navigate("/dashboard");
         })
         .finally(() => {
@@ -337,6 +365,10 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     return mergedData;
   };
 
+  const formatChemicalFormula = (formula) => {
+    return formula.replace(/(\d+)/g, (match) => `<sub>${match}</sub>`);
+  };
+
   const handleDOIClick = (doi) => {
     if (!doi) return;
 
@@ -570,6 +602,101 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     calculateSelectivity();
   }, [readings]);
 
+  const handleDeleteRow = (row) => {
+    setDeleteModalConfig({
+      isOpen: true,
+      type: "row",
+      rowData: row,
+      publications: null,
+      title: isAuthorized ? "Delete Row" : "Unauthorized",
+      message: isAuthorized
+        ? "Are you sure you want to delete this entire row? This action cannot be undone."
+        : "You don't have permission to delete entries.",
+    });
+  };
+
+  const handleDeletePublications = (row) => {
+    setDeleteModalConfig({
+      isOpen: true,
+      type: "publications",
+      rowData: row,
+      publications: row.publications,
+      title: isAuthorized ? "Delete Publications" : "Unauthorized",
+      message: isAuthorized
+        ? "Select the publications you want to delete:"
+        : "You don't have permission to delete entries.",
+    });
+  };
+
+  const renderActionButtons = (row) => (
+    <div className="action-buttons">
+      <button
+        className="edit-button"
+        onClick={() => handleEditClick(row)}
+        title="Edit this dataset"
+      >
+        <span>✏️</span>
+      </button>
+      {isAuthorized && (
+        <>
+          <button
+            className="delete-button"
+            onClick={() => handleDeleteRow(row)}
+            title="Delete entire row"
+          >
+            <span>🗑️</span>
+          </button>
+          {row.publications.length > 1 && (
+            <button
+              className="delete-publications-button"
+              onClick={() => handleDeletePublications(row)}
+              title="Delete specific publications"
+            >
+              <span>📄❌</span>
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const handleDeleteConfirm = async (selectedPublications) => {
+    try {
+      const { type, rowData } = deleteModalConfig;
+
+      const response = await fetch(`${API_BASE_URL}/delete-data`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          type,
+          element: element,
+          rowData,
+          publications: selectedPublications,
+        }),
+      });
+
+      if (response.ok) {
+        // Refresh data
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        console.error("Delete error:", error);
+      }
+    } catch (error) {
+      console.error("Error deleting data:", error);
+    } finally {
+      setDeleteModalConfig({
+        isOpen: false,
+        type: null,
+        rowData: null,
+        publications: null,
+      });
+    }
+  };
+
   return (
     <>
       <Navbar setUser={setUser} isAuthorized={isAuthorized} />
@@ -612,6 +739,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                 <thead>
                   <tr>
                     <th>Material</th>
+                    <th>Technique</th>
                     <th>Precursor</th>
                     <th>Co-reactant</th>
                     <th>Pretreatment</th>
@@ -625,20 +753,44 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                   {getMergedRows(elementData).map((row, index) => (
                     <tr key={index}>
                       {row.spans.material > 0 && (
-                        <td rowSpan={row.spans.material}>{row.material}</td>
+                        <td
+                          rowSpan={row.spans.material}
+                          dangerouslySetInnerHTML={{
+                            __html: formatChemicalFormula(row.material),
+                          }}
+                        />
+                      )}
+                      {row.spans.material > 0 && (
+                        <td rowSpan={row.spans.material}>
+                          {row.technique || "-"}
+                        </td>
                       )}
                       {row.spans.precursor > 0 && (
-                        <td rowSpan={row.spans.precursor}>{row.precursor}</td>
+                        <td
+                          rowSpan={row.spans.precursor}
+                          dangerouslySetInnerHTML={{
+                            __html: formatChemicalFormula(row.precursor),
+                          }}
+                        />
                       )}
                       {row.spans.coreactant > 0 && (
-                        <td rowSpan={row.spans.coreactant}>{row.coreactant}</td>
+                        <td
+                          rowSpan={row.spans.coreactant}
+                          dangerouslySetInnerHTML={{
+                            __html: formatChemicalFormula(row.coreactant),
+                          }}
+                        />
                       )}
                       {row.spans.pretreatment > 0 && (
                         <td rowSpan={row.spans.pretreatment}>
                           {row.pretreatment}
                         </td>
                       )}
-                      <td>{row.surface}</td>
+                      <td
+                        dangerouslySetInnerHTML={{
+                          __html: formatChemicalFormula(row.surface),
+                        }}
+                      />
                       <td>
                         <PublicationCell
                           publications={row.publications}
@@ -649,15 +801,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                       <td>
                         <DOICell publications={row.publications} />
                       </td>
-                      <td>
-                        <button
-                          className="edit-button"
-                          onClick={() => handleEditClick(row)}
-                          title="Edit this dataset"
-                        >
-                          <span>✏️</span>
-                        </button>
-                      </td>
+                      <td>{renderActionButtons(row)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -678,10 +822,10 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                 <div className="charts-wrapper">
                   <div className="chart-container">
                     <h3>Cycle vs Thickness</h3>
-                    <ResponsiveContainer width="100%" aspect={1}>
+                    <ResponsiveContainer width="100%" height={500}>
                       <LineChart
                         data={combinedData()}
-                        margin={{ top: 20, right: 110, left: 20, bottom: 20 }}
+                        margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
                       >
                         <CartesianGrid
                           strokeDasharray="3 3"
@@ -738,49 +882,25 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                           )}
                         />
                         <Legend
-                          verticalAlign="middle"
-                          align="right"
-                          layout="vertical"
+                          verticalAlign="bottom"
+                          align="center"
+                          layout="horizontal"
                           wrapperStyle={{
-                            paddingLeft: "20px",
-                            position: "absolute",
-                            right: 0,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            backgroundColor: "rgba(255, 255, 255, 0.8)",
-                            border: "1px solid #eee",
-                            borderRadius: "4px",
+                            position: "relative",
+                            marginTop: "20px",
+                            width: "100%",
                           }}
                           content={({ payload }) => {
                             if (!payload) return null;
                             return (
-                              <div style={{ padding: "8px" }}>
+                              <div className="chart-legend-container">
                                 {payload.map((entry, index) => (
-                                  <div
-                                    key={index}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      marginBottom: "8px",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
+                                  <div key={index} className="legend-item">
                                     <div
-                                      style={{
-                                        width: "40px",
-                                        height: "3px",
-                                        backgroundColor: entry.color,
-                                        marginRight: "8px",
-                                        flexShrink: 0,
-                                      }}
+                                      className="legend-line"
+                                      style={{ backgroundColor: entry.color }}
                                     />
-                                    <span
-                                      style={{
-                                        color: "#1f2937",
-                                        fontSize: "16px",
-                                        fontWeight: 600,
-                                      }}
-                                    >
+                                    <span className="legend-text">
                                       {entry.value}
                                     </span>
                                   </div>
@@ -789,24 +909,15 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                             );
                           }}
                         />
-                        <Tooltip
-                          formatter={(value) =>
-                            value !== null ? `${value} nm` : "No data"
-                          }
-                          labelFormatter={(value) => `Cycle: ${value}`}
-                          contentStyle={{
-                            fontSize: "16px",
-                            fontWeight: 500,
-                          }}
-                        />
                         {renderLines()}
                       </LineChart>
                     </ResponsiveContainer>
+                    <div style={{ height: "100px" }} />
                   </div>
                   {selectivityData.length > 0 && (
                     <div className="chart-container">
                       <h3>Selectivity</h3>
-                      <ResponsiveContainer width="100%" aspect={1}>
+                      <ResponsiveContainer width="100%" height={500}>
                         <LineChart
                           data={selectivityData}
                           margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
@@ -870,6 +981,16 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           </>
         )}
       </div>
+      <DeleteModal
+        isOpen={deleteModalConfig.isOpen}
+        onClose={() => setDeleteModalConfig({ isOpen: false })}
+        onConfirm={handleDeleteConfirm}
+        title={deleteModalConfig.title}
+        message={deleteModalConfig.message}
+        publications={deleteModalConfig.publications}
+        isMultiSelect={deleteModalConfig.type === "publications"}
+        isAuthorized={isAuthorized} 
+      />
     </>
   );
 };
