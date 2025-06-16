@@ -193,30 +193,39 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     const groupAndSort = (rows) => {
       const groups = {};
 
-      // Group by material
       rows.forEach((row) => {
+        if (!row || !row.material) return;
+
         if (!groups[row.material]) {
-          groups[row.material] = {};
+          groups[row.material] = {
+            technique: row.technique,
+            precursors: {},
+          };
         }
 
-        if (!groups[row.material][row.precursor]) {
-          groups[row.material][row.precursor] = {};
+        const precursor = row.precursor || "";
+        const coreactant = row.coreactant || "";
+        const pretreatment = row.pretreatment || "";
+
+        // Initialize nested objects safely
+        if (!groups[row.material].precursors[precursor]) {
+          groups[row.material].precursors[precursor] = {};
         }
 
-        if (!groups[row.material][row.precursor][row.coreactant]) {
-          groups[row.material][row.precursor][row.coreactant] = {};
+        if (!groups[row.material].precursors[precursor][coreactant]) {
+          groups[row.material].precursors[precursor][coreactant] = {};
         }
 
         if (
-          !groups[row.material][row.precursor][row.coreactant][row.pretreatment]
+          !groups[row.material].precursors[precursor][coreactant][pretreatment]
         ) {
-          groups[row.material][row.precursor][row.coreactant][
-            row.pretreatment
-          ] = [];
+          groups[row.material].precursors[precursor][coreactant][pretreatment] =
+            [];
         }
 
-        groups[row.material][row.precursor][row.coreactant][
-          row.pretreatment
+        // Add the row to the appropriate group
+        groups[row.material].precursors[precursor][coreactant][
+          pretreatment
         ].push(row);
       });
 
@@ -227,35 +236,41 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     const flattenGroups = (groups) => {
       const result = [];
 
-      Object.entries(groups).forEach(([material, precursors]) => {
-        Object.entries(precursors).forEach(([precursor, coreactants]) => {
-          Object.entries(coreactants).forEach(([coreactant, pretreatments]) => {
-            // Sort pretreatments to maximize merging
-            const pretreatmentGroups = {};
-            Object.entries(pretreatments).forEach(([pretreatment, rows]) => {
-              if (!pretreatmentGroups[pretreatment]) {
-                pretreatmentGroups[pretreatment] = [];
-              }
-              pretreatmentGroups[pretreatment].push(...rows);
-            });
+      Object.entries(groups).forEach(([material, materialData]) => {
+        const technique = materialData.technique || "";
 
-            // Convert pretreatment groups to array and sort for optimal merging
-            const sortedPretreatments = Object.entries(pretreatmentGroups).sort(
-              ([a], [b]) => {
-                // Sort by group size (descending) then alphabetically
-                const sizeA = pretreatmentGroups[a].length;
-                const sizeB = pretreatmentGroups[b].length;
-                if (sizeB !== sizeA) return sizeB - sizeA;
-                return a.localeCompare(b);
+        if (!materialData || !materialData.precursors) return; // Skip invalid material data
+
+        Object.entries(materialData.precursors).forEach(
+          ([precursor, coreactants]) => {
+            if (!coreactants) return; // Skip invalid precursor data
+
+            Object.entries(coreactants).forEach(
+              ([coreactant, pretreatments]) => {
+                if (!pretreatments) return; // Skip invalid coreactant data
+
+                Object.entries(pretreatments).forEach(
+                  ([pretreatment, rows]) => {
+                    if (!Array.isArray(rows)) return; // Skip invalid rows
+
+                    rows.forEach((row) => {
+                      if (!row) return; // Skip invalid row
+
+                      result.push({
+                        ...row,
+                        material,
+                        technique,
+                        precursor,
+                        coreactant,
+                        pretreatment,
+                      });
+                    });
+                  }
+                );
               }
             );
-
-            // Add rows to result maintaining the hierarchy
-            sortedPretreatments.forEach(([_, rows]) => {
-              result.push(...rows);
-            });
-          });
-        });
+          }
+        );
       });
 
       return result;
@@ -753,17 +768,17 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                   {getMergedRows(elementData).map((row, index) => (
                     <tr key={index}>
                       {row.spans.material > 0 && (
-                        <td
-                          rowSpan={row.spans.material}
-                          dangerouslySetInnerHTML={{
-                            __html: formatChemicalFormula(row.material),
-                          }}
-                        />
-                      )}
-                      {row.spans.material > 0 && (
-                        <td rowSpan={row.spans.material}>
-                          {row.technique || "-"}
-                        </td>
+                        <>
+                          <td
+                            rowSpan={row.spans.material}
+                            dangerouslySetInnerHTML={{
+                              __html: formatChemicalFormula(row.material),
+                            }}
+                          />
+                          <td rowSpan={row.spans.material}>
+                            {row.technique || "-"}
+                          </td>
+                        </>
                       )}
                       {row.spans.precursor > 0 && (
                         <td
@@ -881,6 +896,13 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                               i * calculateAxisRanges().thicknessInterval
                           )}
                         />
+                        <Tooltip
+                          formatter={(value, name) => {
+                            const [index, author] = name.split("-");
+                            return [`${value.toFixed(2)} nm`, author];
+                          }}
+                          labelFormatter={(value) => `Cycles: ${value}`}
+                        />
                         <Legend
                           verticalAlign="bottom"
                           align="center"
@@ -989,7 +1011,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         message={deleteModalConfig.message}
         publications={deleteModalConfig.publications}
         isMultiSelect={deleteModalConfig.type === "publications"}
-        isAuthorized={isAuthorized} 
+        isAuthorized={isAuthorized}
       />
     </>
   );

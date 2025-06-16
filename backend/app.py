@@ -294,7 +294,7 @@ def add_data():
 def add_data_to_db(data, submitter):    
     element = data.get("element")
     material = data.get("material")
-    technique = data.get("technique", "")
+    technique = data.get("technique")
     precursor = data.get("precursor")
     coreactant = data.get("coreactant")
     surface = data.get("surface")
@@ -332,10 +332,12 @@ def add_data_to_db(data, submitter):
     if not material_doc:
         material_doc = {
             "material": material,
-            "technique": technique,
+            "technique": data.get("technique"),
             "pre_cor": []
         }
         element_doc["materials"].append(material_doc)
+    else:
+        pass
         
     # Step 03: Check if precursor-coreactant pair exists
     pair = f"{precursor}|{coreactant}"
@@ -413,6 +415,9 @@ def update_data():
                            if m["material"] == original["material"]), None)
         if not material_doc:
             return jsonify({"error": "Material not found"}), 404
+
+        if "technique" in updated:
+            material_doc["technique"] = updated["technique"]
             
         # Update pre_cor
         pair_doc = next((p for p in material_doc["pre_cor"] 
@@ -635,6 +640,7 @@ def get_element_data():
         formatted_data = []
         for material in doc.get("materials", []):
             material_name = material["material"]
+            technique = material.get("technique", "")
             for pair in material.get("pre_cor", []):
                 precursor = pair["precursor"]
                 coreactant = pair["coreactant"]
@@ -647,6 +653,7 @@ def get_element_data():
                     
                     formatted_data.append({
                         "material": material_name,
+                        "technique": technique,
                         "precursor": precursor,
                         "coreactant": coreactant,
                         "surface": surface,

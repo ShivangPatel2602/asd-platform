@@ -128,6 +128,7 @@ const EditData = ({ setUser, isAuthorized }) => {
         },
         updated: {
           ...formData,
+          technique: formData.technique,
           publications,
           readings: formattedReadings,
         },
