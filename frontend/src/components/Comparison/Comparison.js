@@ -189,16 +189,17 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
   };
 
   const getMergedRows = (data) => {
-    // First, create groups based on material -> precursor -> coreactant -> pretreatment hierarchy
     const groupAndSort = (rows) => {
       const groups = {};
-
       rows.forEach((row) => {
         if (!row || !row.material) return;
 
-        if (!groups[row.material]) {
-          groups[row.material] = {
-            technique: row.technique,
+        const materialTechKey = `${row.material}|${row.technique || ""}`;
+
+        if (!groups[materialTechKey]) {
+          groups[materialTechKey] = {
+            material: row.material,
+            technique: row.technique || "",
             precursors: {},
           };
         }
@@ -207,24 +208,25 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         const coreactant = row.coreactant || "";
         const pretreatment = row.pretreatment || "";
 
-        // Initialize nested objects safely
-        if (!groups[row.material].precursors[precursor]) {
-          groups[row.material].precursors[precursor] = {};
+        if (!groups[materialTechKey].precursors[precursor]) {
+          groups[materialTechKey].precursors[precursor] = {};
         }
 
-        if (!groups[row.material].precursors[precursor][coreactant]) {
-          groups[row.material].precursors[precursor][coreactant] = {};
+        if (!groups[materialTechKey].precursors[precursor][coreactant]) {
+          groups[materialTechKey].precursors[precursor][coreactant] = {};
         }
 
         if (
-          !groups[row.material].precursors[precursor][coreactant][pretreatment]
+          !groups[materialTechKey].precursors[precursor][coreactant][
+            pretreatment
+          ]
         ) {
-          groups[row.material].precursors[precursor][coreactant][pretreatment] =
-            [];
+          groups[materialTechKey].precursors[precursor][coreactant][
+            pretreatment
+          ] = [];
         }
 
-        // Add the row to the appropriate group
-        groups[row.material].precursors[precursor][coreactant][
+        groups[materialTechKey].precursors[precursor][coreactant][
           pretreatment
         ].push(row);
       });
@@ -232,34 +234,31 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       return groups;
     };
 
-    // Convert nested groups back to flat array with optimal ordering
     const flattenGroups = (groups) => {
       const result = [];
 
-      Object.entries(groups).forEach(([material, materialData]) => {
-        const technique = materialData.technique || "";
-
-        if (!materialData || !materialData.precursors) return; // Skip invalid material data
+      Object.entries(groups).forEach(([materialKey, materialData]) => {
+        if (!materialData || !materialData.precursors) return;
 
         Object.entries(materialData.precursors).forEach(
           ([precursor, coreactants]) => {
-            if (!coreactants) return; // Skip invalid precursor data
+            if (!coreactants) return;
 
             Object.entries(coreactants).forEach(
               ([coreactant, pretreatments]) => {
-                if (!pretreatments) return; // Skip invalid coreactant data
+                if (!pretreatments) return;
 
                 Object.entries(pretreatments).forEach(
                   ([pretreatment, rows]) => {
-                    if (!Array.isArray(rows)) return; // Skip invalid rows
+                    if (!Array.isArray(rows)) return;
 
                     rows.forEach((row) => {
-                      if (!row) return; // Skip invalid row
+                      if (!row) return;
 
                       result.push({
                         ...row,
-                        material,
-                        technique,
+                        material: materialData.material,
+                        technique: materialData.technique,
                         precursor,
                         coreactant,
                         pretreatment,
@@ -283,13 +282,13 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     // Calculate spans for the reordered data
     const mergedData = [];
     let currentRowSpans = {
-      material: 1,
+      materialTech: 1,
       precursor: 1,
       coreactant: 1,
       pretreatment: 1,
     };
     let previousValues = {
-      material: orderedData[0].material,
+      materialTech: `${orderedData[0].material}|${orderedData[0].technique}`,
       precursor: orderedData[0].precursor,
       coreactant: orderedData[0].coreactant,
       pretreatment: orderedData[0].pretreatment,
@@ -310,18 +309,16 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     for (let i = 1; i < orderedData.length; i++) {
       const row = orderedData[i];
       const newRow = { ...row, spans: {} };
-
-      // Calculate spans while maintaining hierarchy
-      if (row.material === previousValues.material) {
-        mergedData[mergedData.length - currentRowSpans.material].spans
+      const currentMaterialTech = `${row.material}|${row.technique}`;
+      if (currentMaterialTech === previousValues.materialTech) {
+        mergedData[mergedData.length - currentRowSpans.materialTech].spans
           .material++;
         newRow.spans.material = 0;
-        currentRowSpans.material++;
+        currentRowSpans.materialTech++;
       } else {
         newRow.spans.material = 1;
-        currentRowSpans.material = 1;
-        previousValues.material = row.material;
-        // Reset dependent spans
+        currentRowSpans.materialTech = 1;
+        previousValues.materialTech = currentMaterialTech;
         currentRowSpans.precursor = 1;
         currentRowSpans.coreactant = 1;
         currentRowSpans.pretreatment = 1;

@@ -114,6 +114,10 @@ const SubmissionReview = ({ setUser, isAuthorized }) => {
                     <strong>Material:</strong>{" "}
                     {selectedSubmission.data.material}
                   </p>
+                  <p>
+                    <strong>Technique:</strong>{" "}
+                    {selectedSubmission.data.technique}
+                  </p>
                 </div>
 
                 <div className="data-section">

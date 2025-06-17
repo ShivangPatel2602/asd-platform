@@ -294,7 +294,7 @@ def add_data():
 def add_data_to_db(data, submitter):    
     element = data.get("element")
     material = data.get("material")
-    technique = data.get("technique")
+    technique = data.get("technique", "")
     precursor = data.get("precursor")
     coreactant = data.get("coreactant")
     surface = data.get("surface")
@@ -328,16 +328,19 @@ def add_data_to_db(data, submitter):
         }
         
     # Step 02: Checking if material exists under the element
-    material_doc = next((m for m in element_doc["materials"] if m["material"] == material), None)
+    material_doc = next(
+        (m for m in element_doc["materials"] 
+         if m["material"] == material and m["technique"] == technique), 
+        None
+    )
+    
     if not material_doc:
         material_doc = {
             "material": material,
-            "technique": data.get("technique"),
+            "technique": technique,
             "pre_cor": []
         }
         element_doc["materials"].append(material_doc)
-    else:
-        pass
         
     # Step 03: Check if precursor-coreactant pair exists
     pair = f"{precursor}|{coreactant}"
@@ -411,13 +414,27 @@ def update_data():
             return jsonify({"error": "Element not found"}), 404
             
         # Update material
-        material_doc = next((m for m in element_doc["materials"] 
-                           if m["material"] == original["material"]), None)
+        material_doc = next(
+            (m for m in element_doc["materials"] 
+             if m["material"] == original["material"] and 
+             m.get("technique", "") == original.get("technique", "")), 
+            None
+        )
+        
         if not material_doc:
-            return jsonify({"error": "Material not found"}), 404
+            return jsonify({"error": "Material with specified technique not found"}), 404
 
-        if "technique" in updated:
-            material_doc["technique"] = updated["technique"]
+        # If technique is being changed, create new material entry
+        if "technique" in updated and updated["technique"] != material_doc["technique"]:
+            new_material_doc = {
+                "material": material_doc["material"],
+                "technique": updated["technique"],
+                "pre_cor": material_doc["pre_cor"]
+            }
+            element_doc["materials"].append(new_material_doc)
+            # Remove old material entry
+            element_doc["materials"].remove(material_doc)
+            material_doc = new_material_doc
             
         # Update pre_cor
         pair_doc = next((p for p in material_doc["pre_cor"] 
@@ -490,6 +507,7 @@ def notify_authorized_users(data, submitter):
             <p><strong>Submitter:</strong> {submitter['name']}</p>
             <p><strong>Element:</strong> {data['element']}</p>
             <p><strong>Material:</strong> {data['material']}</p>
+            <p><strong>Technique:</strong> {data.get('technique', '-')}</p>
             <p>Please review the submission on the platform.</p>
         """
         mail.send(notify_msg)

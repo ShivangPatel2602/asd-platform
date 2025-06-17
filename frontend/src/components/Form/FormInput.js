@@ -171,6 +171,7 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
       setForm({
         element: "",
         material: "",
+        technique: "",
         precursor: "",
         coreactant: "",
         temperature: "",

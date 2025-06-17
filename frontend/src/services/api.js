@@ -6,6 +6,7 @@ export const submitFormData = async (data, user) => {
     const submissionData = {
         element: data.element,
         material: data.material,
+        technique: data.technique,
         precursor: data.precursor,
         coreactant: data.coreactant,
         temperature: data.temperature,
