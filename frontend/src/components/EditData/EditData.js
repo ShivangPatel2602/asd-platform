@@ -14,6 +14,7 @@ const EditData = ({ setUser, isAuthorized }) => {
   const [status, setStatus] = useState("");
   const [cursorPositions, setCursorPositions] = useState({});
   const [textareaContent, setTextareaContent] = useState({});
+  const [publicationFields, setPublicationFields] = useState([]);
 
   useEffect(() => {
     if (!rowData) {
@@ -33,6 +34,19 @@ const EditData = ({ setUser, isAuthorized }) => {
     });
 
     setPublications(rowData.publications || []);
+
+    const initialPublicationFields = rowData.publications.map((pub) => ({
+      material: rowData.material,
+      technique: rowData.technique || "",
+      precursor: rowData.precursor,
+      coreactant: rowData.coreactant,
+      pretreatment: rowData.pretreatment,
+      surface: rowData.surface,
+      temperature: rowData.temperature,
+      hasCustomFields: false,
+    }));
+
+    setPublicationFields(initialPublicationFields);
 
     const fetchReadings = async () => {
       const allReadings = [];
@@ -72,26 +86,22 @@ const EditData = ({ setUser, isAuthorized }) => {
   };
 
   const handleReadingsChange = (index, value, cursorStart, cursorEnd) => {
-    // Immediately update textarea content to maintain cursor position
     setTextareaContent((prev) => ({
       ...prev,
       [index]: value,
     }));
 
-    // Process the readings but preserve empty lines
     const parsedReadings = processReadingsText(value);
 
     setReadings((prev) => {
       const newReadings = [...prev];
       newReadings[index] = {
         publication: readings[index]?.publication || publications[index],
-        // Don't filter out empty readings during editing
         readings: parsedReadings,
       };
       return newReadings;
     });
 
-    // Store cursor position
     setCursorPositions((prev) => ({
       ...prev,
       [index]: { start: cursorStart, end: cursorEnd },
@@ -114,26 +124,55 @@ const EditData = ({ setUser, isAuthorized }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const formattedReadings = readings.map((reading) => ({
-        publication: reading.publication,
-        readings: reading.readings.filter(
-          (r) => r.cycles !== "" || r.thickness !== ""
-        ),
+      // Build a list of all publications with their intended parent fields
+      const allPubs = publications.map((pub, index) => ({
+        ...pub,
+        parentFields: publicationFields[index].hasCustomFields
+          ? publicationFields[index]
+          : formData,
       }));
 
+      // Group by parentFields
+      const groups = {};
+      allPubs.forEach((pub, idx) => {
+        const key = [
+          pub.parentFields.material,
+          pub.parentFields.technique,
+          pub.parentFields.precursor,
+          pub.parentFields.coreactant,
+          pub.parentFields.pretreatment,
+          pub.parentFields.surface,
+          pub.parentFields.temperature,
+        ].join("|");
+        if (!groups[key]) {
+          groups[key] = {
+            ...pub.parentFields,
+            publications: [],
+            readings: [],
+          };
+        }
+        groups[key].publications.push(pub);
+        groups[key].readings.push(readings[idx]);
+      });
+
+      // Prepare a single payload with all groups
       const payload = {
         original: {
           ...rowData,
           element,
         },
-        updated: {
-          ...formData,
-          technique: formData.technique,
-          publications,
-          readings: formattedReadings,
-        },
+        updatedGroups: Object.values(groups).map((group) => ({
+          ...group,
+          readings: group.readings.map((reading) => ({
+            publication: reading.publication,
+            readings: reading.readings.filter(
+              (r) => r.cycles !== "" || r.thickness !== ""
+            ),
+          })),
+        })),
       };
 
+      // Send a single request
       const response = await fetch(
         `${config.BACKEND_API_URL}/api/update-data`,
         {
@@ -146,15 +185,13 @@ const EditData = ({ setUser, isAuthorized }) => {
         }
       );
 
-      const data = await response.json();
+      if (!response.ok) throw new Error("Update failed");
 
-      if (response.ok) {
-        setStatus("Data updated successfully!");
-        setTimeout(() => navigate(`/comparison?element=${element}`), 1500);
-      } else {
-        setStatus(`Failed to update data: ${data.error || "Unknown error"}`);
-        console.error("Update error:", data);
-      }
+      setStatus("Data updated successfully!");
+      setTimeout(() => {
+        navigate(`/comparison?element=${element}`, { replace: true });
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error("Error updating data:", error);
       setStatus(`Failed to update data: ${error.message}`);
@@ -200,6 +237,46 @@ const EditData = ({ setUser, isAuthorized }) => {
             <h3>Publications</h3>
             {publications.map((pub, index) => (
               <div key={index} className="publication-edit">
+                <div className="publication-controls">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={publicationFields[index].hasCustomFields}
+                      onChange={(e) => {
+                        const newFields = [...publicationFields];
+                        newFields[index].hasCustomFields = e.target.checked;
+                        setPublicationFields(newFields);
+                      }}
+                    />
+                    Customize parent fields for this publication
+                  </label>
+                </div>
+                {publicationFields[index].hasCustomFields && (
+                  <div className="custom-fields-section">
+                    <h4>Custom Parent Fields</h4>
+                    <div className="form-grid">
+                      {Object.entries(formData).map(
+                        ([key, value]) =>
+                          key !== "element" && (
+                            <div key={key} className="form-group">
+                              <label>
+                                {key.charAt(0).toUpperCase() + key.slice(1)}
+                              </label>
+                              <input
+                                type="text"
+                                value={publicationFields[index][key]}
+                                onChange={(e) => {
+                                  const newFields = [...publicationFields];
+                                  newFields[index][key] = e.target.value;
+                                  setPublicationFields(newFields);
+                                }}
+                              />
+                            </div>
+                          )
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="form-grid">
                   <div className="form-group">
                     <label>Author</label>
@@ -251,7 +328,6 @@ const EditData = ({ setUser, isAuthorized }) => {
                   </div>
                 </div>
 
-                {/* Readings for this publication */}
                 <div className="readings-edit">
                   <h4>Readings</h4>
                   <textarea

@@ -396,99 +396,130 @@ def add_data_to_db(data, submitter):
 
 @app.route("/api/update-data", methods=["PUT"])
 def update_data():
-    user = session.get('user')
-    if not user:
-        return jsonify({"error": "Not authenticated"}), 401
-    
-    data = request.get_json()
-    original = data.get("original")
-    updated = data.get("updated")
-    
-    if not original or not updated:
-        return jsonify({"error": "Both original and updated data are required"}), 400
-    
     try:
-        # Find and update the specific document
+        user = session.get('user')
+        if not user:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        data = request.get_json()
+        original = data.get("original")
+        updated_groups = data.get("updatedGroups")
+
+        if not original or not updated_groups:
+            return jsonify({"error": "Both original and updatedGroups are required"}), 400
+
         element_doc = collection.find_one({"element": original["element"]})
         if not element_doc:
             return jsonify({"error": "Element not found"}), 404
-            
-        # Update material
-        material_doc = next(
-            (m for m in element_doc["materials"] 
-             if m["material"] == original["material"] and 
-             m.get("technique", "") == original.get("technique", "")), 
+
+        # Step 1: Remove all publications from the original location
+        original_material = next(
+            (m for m in element_doc["materials"]
+             if m["material"] == original["material"] and
+             m.get("technique", "") == original.get("technique", "")),
             None
         )
-        
-        if not material_doc:
-            return jsonify({"error": "Material with specified technique not found"}), 404
-
-        # If technique is being changed, create new material entry
-        if "technique" in updated and updated["technique"] != material_doc["technique"]:
-            new_material_doc = {
-                "material": material_doc["material"],
-                "technique": updated["technique"],
-                "pre_cor": material_doc["pre_cor"]
-            }
-            element_doc["materials"].append(new_material_doc)
-            # Remove old material entry
-            element_doc["materials"].remove(material_doc)
-            material_doc = new_material_doc
-            
-        # Update pre_cor
-        pair_doc = next((p for p in material_doc["pre_cor"] 
-                        if p["precursor"] == original["precursor"] 
-                        and p["coreactant"] == original["coreactant"]), None)
-        if not pair_doc:
-            return jsonify({"error": "Precursor-coreactant pair not found"}), 404
-            
-        # Update condition
-        condition_doc = next((c for c in pair_doc["conditions"] 
-                            if c["surface"] == original["surface"]
-                            and c["pretreatment"] == original["pretreatment"]), None)
-        if not condition_doc:
-            return jsonify({"error": "Condition not found"}), 404
-            
-        # Update the condition with new data
-        condition_doc["surface"] = updated["surface"]
-        condition_doc["pretreatment"] = updated["pretreatment"]
-        
-        # Update publications and readings
-        for pub_index, pub in enumerate(updated["publications"]):
-            # Ensure publication has all required fields
-            publication_data = {
-                "author": pub.get("author", ""),
-                "journal": pub.get("journal", ""),
-                "year": pub.get("year", ""),
-                "doi": pub.get("doi", "")
-            }
-            
-            if pub_index < len(condition_doc["publications"]):
-                condition_doc["publications"][pub_index]["publication"] = publication_data
-                condition_doc["publications"][pub_index]["readings"] = (
-                    updated["readings"][pub_index]["readings"]
-                    if pub_index < len(updated["readings"]) else []
+        if original_material:
+            original_pair = next(
+                (p for p in original_material["pre_cor"]
+                 if p["precursor"] == original["precursor"] and
+                 p["coreactant"] == original["coreactant"]),
+                None
+            )
+            if original_pair:
+                original_condition = next(
+                    (c for c in original_pair["conditions"]
+                     if c["surface"] == original["surface"] and
+                     c["pretreatment"] == original["pretreatment"]),
+                    None
                 )
-            else:
-                condition_doc["publications"].append({
-                    "publication": publication_data,
-                    "readings": (
-                        updated["readings"][pub_index]["readings"]
-                        if pub_index < len(updated["readings"]) else []
-                    ),
-                    "submittedBy": {
-                        "email": user.get("email"),
-                        "name": user.get("name", "Unknown"),
-                        "submission_date": datetime.now()
+                if original_condition:
+                    original_condition["publications"] = []
+
+        # Step 2: Add publications to their new locations
+        for group in updated_groups:
+            for pub_data in group["publications"]:
+                pub_readings = next(
+                    (r["readings"] for r in group["readings"]
+                     if r["publication"]["author"] == pub_data["author"]),
+                    []
+                )
+                # Find or create target location for this publication
+                target_material = next(
+                    (m for m in element_doc["materials"]
+                     if m["material"] == group["material"] and
+                     m.get("technique", "") == group.get("technique", "")),
+                    None
+                )
+                if not target_material:
+                    target_material = {
+                        "material": group["material"],
+                        "technique": group.get("technique", ""),
+                        "pre_cor": []
                     }
-                })
-        
-        # Save changes
+                    element_doc["materials"].append(target_material)
+
+                target_pair = next(
+                    (p for p in target_material["pre_cor"]
+                     if p["precursor"] == group["precursor"] and
+                     p["coreactant"] == group["coreactant"]),
+                    None
+                )
+                if not target_pair:
+                    target_pair = {
+                        "precursor": group["precursor"],
+                        "coreactant": group["coreactant"],
+                        "conditions": []
+                    }
+                    target_material["pre_cor"].append(target_pair)
+
+                target_condition = next(
+                    (c for c in target_pair["conditions"]
+                     if c["surface"] == group["surface"] and
+                     c["pretreatment"] == group["pretreatment"]),
+                    None
+                )
+                if not target_condition:
+                    target_condition = {
+                        "surface": group["surface"],
+                        "pretreatment": group["pretreatment"],
+                        "temperature": group.get("temperature"),
+                        "publications": []
+                    }
+                    target_pair["conditions"].append(target_condition)
+
+                # Add publication to target location
+                existing_pub = next(
+                    (p for p in target_condition["publications"]
+                     if p["publication"]["author"] == pub_data["author"]),
+                    None
+                )
+                if existing_pub:
+                    existing_pub["publication"] = pub_data
+                    existing_pub["readings"] = pub_readings
+                else:
+                    target_condition["publications"].append({
+                        "publication": pub_data,
+                        "readings": pub_readings,
+                        "submittedBy": {
+                            "email": user.get("email"),
+                            "name": user.get("name", "Unknown"),
+                            "submission_date": datetime.now()
+                        }
+                    })
+
+        # Step 3: Clean up empty structures
+        for material in element_doc["materials"][:]:
+            for pair in material["pre_cor"][:]:
+                pair["conditions"] = [c for c in pair["conditions"] if c["publications"]]
+                if not pair["conditions"]:
+                    material["pre_cor"].remove(pair)
+            if not material["pre_cor"]:
+                element_doc["materials"].remove(material)
+
         collection.replace_one({"element": original["element"]}, element_doc)
-        
         return jsonify({"message": "Data updated successfully"}), 200
-        
+
     except Exception as e:
         print(f"Error updating data: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
