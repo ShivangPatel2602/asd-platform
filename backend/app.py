@@ -822,7 +822,6 @@ def delete_data():
         if not user:
             return jsonify({"error": "Not authenticated"}), 401
         
-        # Fix authorization check
         is_authorized = authorized_users.find_one({"emails": {"$in": [user.get("email")]}})
         if not is_authorized:
             return jsonify({"error": "Not authorized"}), 403
@@ -833,7 +832,6 @@ def delete_data():
         delete_type = data.get('type')
         publications = data.get('publications', [])
 
-        # Find the document
         element_doc = collection.find_one({"element": element})
         if not element_doc:
             return jsonify({"error": "Element not found"}), 404
@@ -842,7 +840,6 @@ def delete_data():
         if delete_type == 'row' and len(row_data.get('publications', [])) == 1:
             publications = row_data.get('publications', [])
 
-        # Rest of the delete logic...
         if delete_type == 'row':
             # Remove the entire condition
             for material in element_doc['materials']:
@@ -856,6 +853,27 @@ def delete_data():
                                       c['pretreatment'] == row_data['pretreatment'] and
                                       c.get('temperature') == row_data.get('temperature'))
                             ]
+        elif delete_type == 'publications':
+            # Remove only the selected publications from the condition
+            for material in element_doc['materials']:
+                if material['material'] == row_data['material']:
+                    for pair in material['pre_cor']:
+                        if (pair['precursor'] == row_data['precursor'] and 
+                            pair['coreactant'] == row_data['coreactant']):
+                            for condition in pair['conditions']:
+                                if (condition['surface'] == row_data['surface'] and 
+                                    condition['pretreatment'] == row_data['pretreatment'] and
+                                    condition.get('temperature') == row_data.get('temperature')):
+                                    # Remove publications that match any in the publications list
+                                    condition['publications'] = [
+                                        pub for pub in condition['publications']
+                                        if not any(
+                                            pub['publication']['author'] == p['author'] and
+                                            pub['publication'].get('journal', '') == p.get('journal', '') and
+                                            pub['publication'].get('year', '') == p.get('year', '')
+                                            for p in publications
+                                        )
+                                    ]
 
         # Clean up empty structures
         for material in element_doc['materials'][:]:

@@ -207,6 +207,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         const precursor = row.precursor || "";
         const coreactant = row.coreactant || "";
         const pretreatment = row.pretreatment || "";
+        const surface = row.surface || "";
 
         if (!groups[materialTechKey].precursors[precursor]) {
           groups[materialTechKey].precursors[precursor] = {};
@@ -226,8 +227,18 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
           ] = [];
         }
 
-        groups[materialTechKey].precursors[precursor][coreactant][
-          pretreatment
+        if (
+          !groups[materialTechKey].precursors[precursor][coreactant][
+            pretreatment
+          ][surface]
+        ) {
+          groups[materialTechKey].precursors[precursor][coreactant][
+            pretreatment
+          ][surface] = [];
+        }
+
+        groups[materialTechKey].precursors[precursor][coreactant][pretreatment][
+          surface
         ].push(row);
       });
 
@@ -249,19 +260,24 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                 if (!pretreatments) return;
 
                 Object.entries(pretreatments).forEach(
-                  ([pretreatment, rows]) => {
-                    if (!Array.isArray(rows)) return;
+                  ([pretreatment, surfaces]) => {
+                    if (!surfaces) return;
 
-                    rows.forEach((row) => {
-                      if (!row) return;
+                    Object.entries(surfaces).forEach(([surface, rows]) => {
+                      if (!Array.isArray(rows)) return;
 
-                      result.push({
-                        ...row,
-                        material: materialData.material,
-                        technique: materialData.technique,
-                        precursor,
-                        coreactant,
-                        pretreatment,
+                      rows.forEach((row) => {
+                        if (!row) return;
+
+                        result.push({
+                          ...row,
+                          material: materialData.material,
+                          technique: materialData.technique,
+                          precursor,
+                          coreactant,
+                          pretreatment,
+                          surface,
+                        });
                       });
                     });
                   }
@@ -275,7 +291,6 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       return result;
     };
 
-    // Reorder the data for optimal merging
     const groupedData = groupAndSort(data);
     const orderedData = flattenGroups(groupedData);
 
@@ -286,12 +301,14 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
       precursor: 1,
       coreactant: 1,
       pretreatment: 1,
+      surface: 1,
     };
     let previousValues = {
       materialTech: `${orderedData[0].material}|${orderedData[0].technique}`,
       precursor: orderedData[0].precursor,
       coreactant: orderedData[0].coreactant,
       pretreatment: orderedData[0].pretreatment,
+      surface: orderedData[0].surface,
     };
 
     // Add first row
@@ -302,6 +319,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         precursor: 1,
         coreactant: 1,
         pretreatment: 1,
+        surface: 1,
       },
     });
 
@@ -322,6 +340,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         currentRowSpans.precursor = 1;
         currentRowSpans.coreactant = 1;
         currentRowSpans.pretreatment = 1;
+        currentRowSpans.surface = 1;
       }
 
       if (
@@ -339,6 +358,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         // Reset dependent spans
         currentRowSpans.coreactant = 1;
         currentRowSpans.pretreatment = 1;
+        currentRowSpans.surface = 1;
       }
 
       if (
@@ -355,6 +375,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         previousValues.coreactant = row.coreactant;
         // Reset dependent spans
         currentRowSpans.pretreatment = 1;
+        currentRowSpans.surface = 1;
       }
 
       if (
@@ -369,6 +390,20 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
         newRow.spans.pretreatment = 1;
         currentRowSpans.pretreatment = 1;
         previousValues.pretreatment = row.pretreatment;
+        currentRowSpans.surface = 1;
+      }
+
+      if (
+        row.surface === previousValues.surface &&
+        newRow.spans.pretreatment === 0
+      ) {
+        mergedData[mergedData.length - currentRowSpans.surface].spans.surface++;
+        newRow.spans.surface = 0;
+        currentRowSpans.surface++;
+      } else {
+        newRow.spans.surface = 1;
+        currentRowSpans.surface = 1;
+        previousValues.surface = row.surface;
       }
 
       mergedData.push(newRow);
@@ -798,11 +833,14 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
                           {row.pretreatment}
                         </td>
                       )}
-                      <td
-                        dangerouslySetInnerHTML={{
-                          __html: formatChemicalFormula(row.surface),
-                        }}
-                      />
+                      {row.spans.surface > 0 && (
+                        <td
+                          rowSpan={row.spans.surface}
+                          dangerouslySetInnerHTML={{
+                            __html: formatChemicalFormula(row.surface),
+                          }}
+                        />
+                      )}
                       <td>
                         <PublicationCell
                           publications={row.publications}
