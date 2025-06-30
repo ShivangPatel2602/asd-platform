@@ -63,26 +63,15 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={!user ? <LoginPage /> : <Navigate to="/dashboard" />}
-        />
-        <Route
-          path="/dashboard"
           element={
-            user ? (
-              <LandingPage setUser={setUser} isAuthorized={isAuthorized} />
-            ) : (
-              <Navigate to="/" />
-            )
+            <LandingPage setUser={setUser} isAuthorized={isAuthorized} user={user} />
           }
         />
+        <Route path="/login" element={<LoginPage />} />
         <Route
           path="/comparison"
           element={
-            user ? (
-              <MaterialSelector setUser={setUser} isAuthorized={isAuthorized} />
-            ) : (
-              <Navigate to="/" />
-            )
+            <MaterialSelector setUser={setUser} isAuthorized={isAuthorized} user={user} />
           }
         />
         <Route
@@ -95,7 +84,7 @@ function App() {
                 isAuthorized={isAuthorized}
               />
             ) : (
-              <Navigate to="/" />
+              <Navigate to="/login" replace />
             )
           }
         />
@@ -105,13 +94,19 @@ function App() {
             user && isAuthorized ? (
               <SubmissionReview setUser={setUser} isAuthorized={isAuthorized} />
             ) : (
-              <Navigate to="/" />
+              <Navigate to="/login" replace />
             )
           }
         />
         <Route
           path="/edit-data/:element"
-          element={<EditData setUser={setUser} isAuthorized={isAuthorized} />}
+          element={
+            user ? (
+              <EditData setUser={setUser} isAuthorized={isAuthorized} user={user} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

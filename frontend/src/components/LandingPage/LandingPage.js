@@ -5,12 +5,12 @@ import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
 import image from "../../images/ASD - Process.png";
 
-const LandingPage = ({ setUser, isAuthorized }) => {
+const LandingPage = ({ setUser, isAuthorized, user }) => {
   const navigate = useNavigate();
 
   return (
     <>
-      <Navbar setUser={setUser} isAuthorized={isAuthorized} />
+      <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
       <section className="intro-section">
         <div className="left">
           <h2>What Is ASD??</h2>

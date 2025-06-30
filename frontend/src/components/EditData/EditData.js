@@ -4,7 +4,7 @@ import Navbar from "../Navbar/Navbar";
 import "./EditData.css";
 import config from "../../config";
 
-const EditData = ({ setUser, isAuthorized }) => {
+const EditData = ({ setUser, isAuthorized, user }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { rowData, element } = location.state || {};
@@ -202,7 +202,7 @@ const EditData = ({ setUser, isAuthorized }) => {
 
   return (
     <>
-      <Navbar setUser={setUser} isAuthorized={isAuthorized} />
+      <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user}/>
       <div className="edit-data-container">
         <h2>Edit Dataset</h2>
         <form onSubmit={handleSubmit}>

@@ -2,7 +2,7 @@ import {Link, useNavigate} from "react-router-dom";
 import config from "../../config";
 import './Navbar.css';
 
-const Navbar = ({ setUser, isAuthorized }) => {
+const Navbar = ({ setUser, isAuthorized, user }) => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
@@ -26,6 +26,10 @@ const Navbar = ({ setUser, isAuthorized }) => {
         }
     };
     
+    const handleLogin = () => {
+        navigate("/login");
+    }
+
     return (
         <nav className="navbar">
             <div className="navbar-left">
@@ -38,7 +42,14 @@ const Navbar = ({ setUser, isAuthorized }) => {
                 )}
                 <Link to="/search-papers" className="nav-link">Search Papers</Link>
                 <Link to="/know-more" className="nav-link">Know More</Link>
-                <button className="nav-link logout-btn" onClick={handleLogout}>Logout</button>
+                {
+                    user ? (
+                        <button className="nav-link logout-btn" onClick={handleLogout}>Logout</button>
+                    ) : (
+                        <button className="nav-link login-btn" onClick={handleLogin}>Login</button>
+                    )
+                }
+                
             </div>
         </nav>
     );

@@ -171,9 +171,12 @@ def auth_callback():
 @app.route('/api/user')
 def get_user():
     user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
     approved_user = approved_users.find_one({"email": user["email"]})
     if not approved_user:
         session.clear()
+        return jsonify({"error": "Not approved"}), 403
     is_authorized = authorized_users.find_one({"emails": {"$in": [user["email"]]}})
     user["isAuthorized"] = bool(is_authorized)
     return jsonify(user)

@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const MaterialSelector = ({ setUser, isAuthorized }) => {
+const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const [element, setElement] = useState("");
   const [elementData, setElementData] = useState([]);
   const [selectedPublications, setSelectedPublications] = useState({});
@@ -412,8 +412,15 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
     return mergedData;
   };
 
-  const formatChemicalFormula = (formula) => {
-    return formula.replace(/(\d+)/g, (match) => `<sub>${match}</sub>`);
+  const formatChemicalFormula = (value) => {
+    if (typeof value !== "string") return value;
+
+    if (/\s|\(|\)/.test(value)) return value;
+
+   return value.replace(
+      /([A-Za-z])(\d+)/g,
+      (match, p1, p2) => `${p1}<sub>${p2}</sub>`
+    );
   };
 
   const handleDOIClick = (doi) => {
@@ -746,7 +753,7 @@ const MaterialSelector = ({ setUser, isAuthorized }) => {
 
   return (
     <>
-      <Navbar setUser={setUser} isAuthorized={isAuthorized} />
+      <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
       <div className="comparison-container">
         <h2>Data for {element}</h2>
 
