@@ -56,6 +56,16 @@ th {
   background-color: #f4f4f4;
 }
 
+.surface-mode-table th:nth-child(1) { width: 12%; }   
+.surface-mode-table th:nth-child(2) { width: 6%; }  
+.surface-mode-table th:nth-child(3) { width: 5%; }    
+.surface-mode-table th:nth-child(4) { width: 17%; }   
+.surface-mode-table th:nth-child(5) { width: 8%; }  
+.surface-mode-table th:nth-child(6) { width: 17%; }   
+.surface-mode-table th:nth-child(7) { width: 17%; }  
+.surface-mode-table th:nth-child(8) { width: 10%; } 
+.surface-mode-table th:nth-child(9) { width: 10%; }   
+
 table td[rowspan] {
   background-color: #f8fafc;
   vertical-align: middle;

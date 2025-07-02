@@ -722,7 +722,6 @@ def get_element_data():
 @app.route("/api/surfaces-with-data", methods=["GET"])
 def get_surfaces_with_data():
     try:
-        # Aggregate to find all unique surface materials
         pipeline = [
             {"$unwind": "$materials"},
             {"$unwind": "$materials.pre_cor"},
@@ -780,6 +779,7 @@ def get_element_data_by_surface():
                     "_id": {
                         "element": "$element",
                         "material": "$materials.material",
+                        "technique": "$materials.technique",
                         "precursor": "$materials.pre_cor.precursor",
                         "coreactant": "$materials.pre_cor.coreactant",
                         "surface": "$materials.pre_cor.conditions.surface",
@@ -796,6 +796,7 @@ def get_element_data_by_surface():
                     "_id": 0,
                     "element": "$_id.element",
                     "material": "$_id.material",
+                    "technique": "$_id.technique",
                     "precursor": "$_id.precursor",
                     "coreactant": "$_id.coreactant",
                     "surface": "$_id.surface",
@@ -813,6 +814,19 @@ def get_element_data_by_surface():
         ]
 
         result = list(collection.aggregate(pipeline))
+        for row in result:
+            if isinstance(row.get('publications'), list):
+                flat_pubs = []
+                for pub in row['publications']:
+                    if isinstance(pub, list):
+                        flat_pubs.extend(pub)
+                    else:
+                        flat_pubs.append(pub)
+                # Now, for each pub, if it's a dict with a 'publication' key, extract it
+                row['publications'] = [
+                    p['publication'] if isinstance(p, dict) and 'publication' in p else p
+                    for p in flat_pubs
+                ]
         return jsonify(result)
     except Exception as e:
         print(f"Error getting surface data: {str(e)}")

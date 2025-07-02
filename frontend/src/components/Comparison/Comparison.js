@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
 import config from "../../config";
@@ -36,11 +36,12 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
   const API_BASE_URL = `${config.BACKEND_API_URL}/api`;
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const elementParam = params.get("element");
-    const surfaceParam = params.get("surface");
+  const params = new URLSearchParams(location.search);
+  const elementParam = params.get("element");
+  const surfaceParam = params.get("surface");
+  const isSurfaceMode = !!surfaceParam;
 
+  useEffect(() => {
     if (elementParam) {
       setElement(elementParam);
       setIsLoading(true);
@@ -84,12 +85,40 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     }
   }, [location, navigate]);
 
-  const handlePublicationSelect = (rowIndex, publication) => {
+  useEffect(() => {
+    if (elementData.length > 0) {
+      if (elementData.some(row => !row.element)) {
+        setElementData(prev =>
+          prev.map(row => ({
+            ...row,
+            element: row.element || element,
+          }))
+        );
+      }
+    }
+  }, [elementData, element]);
+
+  useEffect(() => {
+    if (isSurfaceMode && elementData.length > 0) {
+      if (elementData.some((row) => !row.element)) {
+        setElementData((prev) =>
+          prev.map((row) => ({
+            ...row,
+            element: row.element || element,
+          }))
+        );
+      }
+    }
+  }, [isSurfaceMode, elementData, element]);
+
+  const handlePublicationSelect = (rowKey, publication) => {
     setSelectedPublications((prev) => {
-      const currentRowSelections = prev[rowIndex] || [];
+      const currentRowSelections = prev[rowKey] || [];
       const isAlreadySelected = currentRowSelections.some(
         (pub) => pub.author === publication.author
       );
+
+      const compositeKey = `${rowKey}-${publication.author}`;
 
       if (isAlreadySelected) {
         const updatedRowSelections = currentRowSelections.filter(
@@ -98,7 +127,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
         setReadings((prevReadings) => {
           const newReadings = { ...prevReadings };
-          delete newReadings[`${rowIndex}-${publication.author}`];
+          delete newReadings[compositeKey];
 
           if (Object.keys(newReadings).length === 0) {
             setShowChart(false);
@@ -109,7 +138,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
         return {
           ...prev,
-          [rowIndex]: updatedRowSelections.length
+          [rowKey]: updatedRowSelections.length
             ? updatedRowSelections
             : undefined,
         };
@@ -118,14 +147,12 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           ...(currentRowSelections || []),
           publication,
         ].slice(-2);
-        const mergedRows = getMergedRows(elementData);
-        const row = mergedRows[rowIndex]; // Use mergedRows instead of elementData
-        const compositeKey = `${rowIndex}-${publication.author}`;
+        const row = mergedRows.find((r) => getRowKey(r) === rowKey);
         fetchDataForRow(row, publication, compositeKey);
 
         return {
           ...prev,
-          [rowIndex]: updatedRowSelections,
+          [rowKey]: updatedRowSelections,
         };
       }
     });
@@ -140,6 +167,19 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     });
   };
 
+  function getRowKey(row) {
+    return [
+      row.element,
+      row.material,
+      row.technique,
+      row.precursor,
+      row.coreactant,
+      row.pretreatment,
+      row.surface,
+      row.temperature,
+    ].join("|");
+  }
+
   const fetchDataForRow = (row, publication, compositeKey) => {
     // Handle both old and new publication formats
     const publicationData = {
@@ -150,7 +190,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     };
 
     const queryParams = new URLSearchParams({
-      element: element,
+      element: row.element,
       material: row.material,
       precursor: row.precursor,
       coreactant: row.coreactant,
@@ -187,6 +227,83 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         setError(`Failed to fetch reading data: ${err.message}`);
       });
   };
+
+  function getOptimallyMergedRows(data, columns) {
+    if (!data.length) return [];
+
+    // Sort data by all columns in order for optimal merging
+    const sorted = [...data].sort((a, b) => {
+      for (const col of columns) {
+        if ((a[col] || "") < (b[col] || "")) return -1;
+        if ((a[col] || "") > (b[col] || "")) return 1;
+      }
+      return 0;
+    });
+
+    const mergedRows = [];
+    const prevValues = {};
+    const rowSpans = {};
+
+    for (let i = 0; i < sorted.length; i++) {
+      const row = { ...sorted[i], spans: {} };
+      for (let c = 0; c < columns.length; c++) {
+        const col = columns[c];
+        if (i === 0) {
+          row.spans[col] = 1;
+          rowSpans[col] = 1;
+          prevValues[col] = row[col];
+        } else {
+          let parentSame = true;
+          for (let pc = 0; pc < c; pc++) {
+            if (sorted[i][columns[pc]] !== sorted[i - 1][columns[pc]]) {
+              parentSame = false;
+              break;
+            }
+          }
+          if (parentSame && row[col] === prevValues[col]) {
+            // Merge with previous
+            let prevIndex = i - 1;
+            while (prevIndex >= 0 && mergedRows[prevIndex].spans[col] === 0) {
+              prevIndex--;
+            }
+            if (prevIndex >= 0) {
+              mergedRows[prevIndex].spans[col]++;
+            }
+            row.spans[col] = 0;
+            rowSpans[col]++;
+          } else {
+            row.spans[col] = 1;
+            rowSpans[col] = 1;
+            prevValues[col] = row[col];
+          }
+        }
+      }
+      mergedRows.push(row);
+    }
+    return mergedRows;
+  }
+
+  const elementModeColumns = [
+    "material",
+    "technique",
+    "precursor",
+    "coreactant",
+    "pretreatment",
+    "surface",
+  ];
+  const surfaceModeColumns = [
+    "surface",
+    "material",
+    "technique",
+    "precursor",
+    "coreactant",
+    "pretreatment",
+  ];
+
+  const mergedRows = getOptimallyMergedRows(
+    elementData,
+    isSurfaceMode ? surfaceModeColumns : elementModeColumns
+  );
 
   const getMergedRows = (data) => {
     const groupAndSort = (rows) => {
@@ -412,12 +529,220 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     return mergedData;
   };
 
+  const getMergedRowsSurfaceMode = (data) => {
+    const groupAndSort = (rows) => {
+      const groups = {};
+      rows.forEach((row) => {
+        if (!row || !row.surface) return;
+
+        const surfaceKey = row.surface;
+        if (!groups[surfaceKey]) {
+          groups[surfaceKey] = { surface: row.surface, materialTechs: {} };
+        }
+        const materialTechKey = `${row.material || ""}|${row.technique || ""}`;
+        if (!groups[surfaceKey].materialTechs[materialTechKey]) {
+          groups[surfaceKey].materialTechs[materialTechKey] = {
+            material: row.material,
+            technique: row.technique || "",
+            precursors: {},
+          };
+        }
+        const precursor = row.precursor || "";
+        if (!groups[surfaceKey].materialTechs[materialTechKey][precursor]) {
+          groups[surfaceKey].materialTechs[materialTechKey][precursor] = {};
+        }
+        const coreactant = row.coreactant || "";
+        if (
+          !groups[surfaceKey].materialTechs[materialTechKey][precursor][
+            coreactant
+          ]
+        ) {
+          groups[surfaceKey].materialTechs[materialTechKey][precursor][
+            coreactant
+          ] = {};
+        }
+        const pretreatment = row.pretreatment || "";
+        if (
+          !groups[surfaceKey].materialTechs[materialTechKey][precursor][
+            coreactant
+          ][pretreatment]
+        ) {
+          groups[surfaceKey].materialTechs[materialTechKey][precursor][
+            coreactant
+          ][pretreatment] = [];
+        }
+        groups[surfaceKey].materialTechs[materialTechKey][precursor][
+          coreactant
+        ][pretreatment].push(row);
+      });
+      return groups;
+    };
+
+    const flattenGroups = (groups) => {
+      const result = [];
+
+      Object.entries(groups).forEach(([surface, surfaceData]) => {
+        Object.entries(surfaceData.materialTechs).forEach(
+          ([materialTechKey, materialTechData]) => {
+            Object.entries(materialTechData.precursors).forEach(
+              ([precursor, coreactants]) => {
+                Object.entries(coreactants).forEach(
+                  ([coreactant, pretreatments]) => {
+                    Object.entries(pretreatments).forEach(
+                      ([pretreatment, rows]) => {
+                        rows.forEach((row) => {
+                          result.push({
+                            ...row,
+                            surface,
+                            material: materialTechData.material,
+                            technique: materialTechData.technique,
+                            precursor,
+                            coreactant,
+                            pretreatment,
+                          });
+                        });
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          }
+        );
+      });
+      return result;
+    };
+
+    const groupedData = groupAndSort(data);
+    const orderedData = flattenGroups(groupedData);
+
+    if (!orderedData.length) return [];
+
+    const mergedData = [];
+    let currentRowSpans = {
+      surface: 1,
+      materialTech: 1,
+      precursor: 1,
+      coreactant: 1,
+      pretreatment: 1,
+    };
+    let previousValues = {
+      surface: orderedData[0]?.surface,
+      materialTech: `${orderedData[0].material}|${orderedData[0].technique}`,
+      precursor: orderedData[0]?.precursor,
+      coreactant: orderedData[0]?.coreactant,
+      pretreatment: orderedData[0]?.pretreatment,
+    };
+
+    mergedData.push({
+      ...orderedData[0],
+      spans: {
+        surface: 1,
+        material: 1,
+        technique: 1,
+        precursor: 1,
+        coreactant: 1,
+        pretreatment: 1,
+      },
+    });
+
+    for (let i = 1; i < orderedData.length; i++) {
+      const row = orderedData[i];
+      const newRow = { ...row, spans: {} };
+      const currentMaterialTech = `${row.material}|${row.technique}`;
+
+      if (row.surface === previousValues.surface) {
+        mergedData[mergedData.length - currentRowSpans.surface].spans.surface++;
+        newRow.spans.surface = 0;
+        currentRowSpans.surface++;
+      } else {
+        newRow.spans.surface = 1;
+        currentRowSpans.surface = 1;
+        previousValues.surface = row.surface;
+        currentRowSpans.materialTech = 1;
+        currentRowSpans.precursor = 1;
+        currentRowSpans.coreactant = 1;
+        currentRowSpans.pretreatment = 1;
+      }
+
+      if (
+        currentMaterialTech === previousValues.materialTech &&
+        newRow.spans.surface === 0
+      ) {
+        mergedData[mergedData.length - currentRowSpans.materialTech].spans
+          .material++;
+        mergedData[mergedData.length - currentRowSpans.materialTech].spans
+          .technique++;
+        newRow.spans.material = 0;
+        newRow.spans.technique = 0;
+        currentRowSpans.materialTech++;
+      } else {
+        newRow.spans.material = 1;
+        newRow.spans.technique = 1;
+        currentRowSpans.materialTech = 1;
+        previousValues.materialTech = currentMaterialTech;
+        currentRowSpans.precursor = 1;
+        currentRowSpans.coreactant = 1;
+        currentRowSpans.pretreatment = 1;
+      }
+
+      if (
+        row.precursor === previousValues.precursor &&
+        newRow.spans.material === 0
+      ) {
+        mergedData[mergedData.length - currentRowSpans.precursor].spans
+          .precursor++;
+        newRow.spans.precursor = 0;
+        currentRowSpans.precursor++;
+      } else {
+        newRow.spans.precursor = 1;
+        currentRowSpans.precursor = 1;
+        previousValues.precursor = row.precursor;
+        currentRowSpans.coreactant = 1;
+        currentRowSpans.pretreatment = 1;
+      }
+
+      if (
+        row.coreactant === previousValues.coreactant &&
+        newRow.spans.precursor === 0
+      ) {
+        mergedData[mergedData.length - currentRowSpans.coreactant].spans
+          .coreactant++;
+        newRow.spans.coreactant = 0;
+        currentRowSpans.coreactant++;
+      } else {
+        newRow.spans.coreactant = 1;
+        currentRowSpans.coreactant = 1;
+        previousValues.coreactant = row.coreactant;
+        currentRowSpans.pretreatment = 1;
+      }
+
+      if (
+        row.pretreatment === previousValues.pretreatment &&
+        newRow.spans.coreactant === 0
+      ) {
+        mergedData[mergedData.length - currentRowSpans.pretreatment].spans
+          .pretreatment++;
+        newRow.spans.pretreatment = 0;
+        currentRowSpans.pretreatment++;
+      } else {
+        newRow.spans.pretreatment = 1;
+        currentRowSpans.pretreatment = 1;
+        previousValues.pretreatment = row.pretreatment;
+      }
+
+      mergedData.push(newRow);
+    }
+
+    return mergedData;
+  };
+
   const formatChemicalFormula = (value) => {
     if (typeof value !== "string") return value;
 
     if (/\s|\(|\)/.test(value)) return value;
 
-   return value.replace(
+    return value.replace(
       /([A-Za-z])(\d+)/g,
       (match, p1, p2) => `${p1}<sub>${p2}</sub>`
     );
@@ -523,34 +848,30 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const combinedData = () => {
     if (Object.keys(readings).length === 0) return [];
 
-    return Object.entries(readings)
-      .reduce((result, [compositeKey, rowReadings]) => {
-        if (!Array.isArray(rowReadings) || rowReadings.length === 0)
-          return result;
+    // Collect all unique cycles
+    const allCycles = new Set();
+    Object.values(readings).forEach((arr) => {
+      if (Array.isArray(arr)) {
+        arr.forEach((r) => allCycles.add(r.cycles));
+      }
+    });
 
-        const sortedReadings = [...rowReadings].sort(
-          (a, b) => a.cycles - b.cycles
-        );
-
-        sortedReadings.forEach((reading) => {
-          const existingPoint = result.find(
-            (p) => p.cycle === reading.cycles
-          ) || {
-            cycle: reading.cycles,
-          };
-          existingPoint[compositeKey] = reading.thickness;
-          if (!result.find((p) => p.cycle === reading.cycles)) {
-            result.push(existingPoint);
+    // For each cycle, build an object with all composite keys
+    return Array.from(allCycles)
+      .sort((a, b) => a - b)
+      .map((cycle) => {
+        const obj = { cycle };
+        Object.entries(readings).forEach(([compositeKey, arr]) => {
+          if (Array.isArray(arr)) {
+            const found = arr.find((r) => r.cycles === cycle);
+            if (found) obj[compositeKey] = found.thickness;
           }
         });
-
-        return result;
-      }, [])
-      .sort((a, b) => a.cycle - b.cycle);
+        return obj;
+      });
   };
 
   const renderLines = () => {
-    const mergedRows = getMergedRows(elementData);
     const colors = [
       "#8884d8",
       "#82ca9d",
@@ -565,16 +886,13 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         if (!Array.isArray(rowReadings) || rowReadings.length === 0)
           return null;
 
-        const [originalIndex, authorName] = compositeKey.split("-");
+        // Extract rowKey and author from compositeKey
+        const lastDash = compositeKey.lastIndexOf("-");
+        const rowKey = compositeKey.substring(0, lastDash);
+        const authorName = compositeKey.substring(lastDash + 1);
 
         // Find the correct row in mergedRows
-        const row = mergedRows.find((r, index) => {
-          const matchingPub = r.publications.find(
-            (p) => p.author === authorName
-          );
-          return matchingPub && index.toString() === originalIndex;
-        });
-
+        const row = mergedRows.find((r) => getRowKey(r) === rowKey);
         if (!row) return null;
 
         // Find the matching publication
@@ -789,82 +1107,121 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
               </div>
             )}
             <div className="table-container">
-              <table>
+              <table className={isSurfaceMode ? "surface-mode-table" : ""}>
                 <thead>
                   <tr>
-                    <th>Material</th>
-                    <th>Technique</th>
-                    <th>Precursor</th>
-                    <th>Co-reactant</th>
-                    <th>Pretreatment</th>
-                    <th>Surface</th>
-                    <th>Dataset</th>
-                    <th>Publication</th>
-                    <th>Edit</th>
+                    {isSurfaceMode ? (
+                      <>
+                        <th>Surface</th>
+                        <th>Material</th>
+                        <th>Technique</th>
+                        <th>Precursor</th>
+                        <th>Co-reactant</th>
+                        <th>Pretreatment</th>
+                        <th>Dataset</th>
+                        <th>Publication</th>
+                        <th>Edit</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Material</th>
+                        <th>Technique</th>
+                        <th>Precursor</th>
+                        <th>Co-reactant</th>
+                        <th>Pretreatment</th>
+                        <th>Surface</th>
+                        <th>Dataset</th>
+                        <th>Publication</th>
+                        <th>Edit</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {getMergedRows(elementData).map((row, index) => (
-                    <tr key={index}>
-                      {row.spans.material > 0 && (
-                        <>
-                          <td
-                            rowSpan={row.spans.material}
-                            dangerouslySetInnerHTML={{
-                              __html: formatChemicalFormula(row.material),
-                            }}
+                  {mergedRows.map((row) => {
+                    const rowKey = getRowKey(row);
+                    return (
+                      <tr key={rowKey}>
+                        {!isSurfaceMode ? (
+                          <>
+                            {row.spans.material > 0 && (
+                              <td rowSpan={row.spans.material}>
+                                {row.material}
+                              </td>
+                            )}
+                            {row.spans.technique > 0 && (
+                              <td rowSpan={row.spans.technique}>
+                                {row.technique}
+                              </td>
+                            )}
+                            {row.spans.precursor > 0 && (
+                              <td rowSpan={row.spans.precursor}>
+                                {row.precursor}
+                              </td>
+                            )}
+                            {row.spans.coreactant > 0 && (
+                              <td rowSpan={row.spans.coreactant}>
+                                {row.coreactant}
+                              </td>
+                            )}
+                            {row.spans.pretreatment > 0 && (
+                              <td rowSpan={row.spans.pretreatment}>
+                                {row.pretreatment}
+                              </td>
+                            )}
+                            {row.spans.surface > 0 && (
+                              <td rowSpan={row.spans.surface}>{row.surface}</td>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {row.spans.surface > 0 && (
+                              <td rowSpan={row.spans.surface}>{row.surface}</td>
+                            )}
+                            {row.spans.material > 0 && (
+                              <td rowSpan={row.spans.material}>
+                                {row.material}
+                              </td>
+                            )}
+                            {row.spans.technique > 0 && (
+                              <td rowSpan={row.spans.technique}>
+                                {row.technique}
+                              </td>
+                            )}
+                            {row.spans.precursor > 0 && (
+                              <td rowSpan={row.spans.precursor}>
+                                {row.precursor}
+                              </td>
+                            )}
+                            {row.spans.coreactant > 0 && (
+                              <td rowSpan={row.spans.coreactant}>
+                                {row.coreactant}
+                              </td>
+                            )}
+                            {row.spans.pretreatment > 0 && (
+                              <td rowSpan={row.spans.pretreatment}>
+                                {row.pretreatment}
+                              </td>
+                            )}
+                          </>
+                        )}
+                        <td>
+                          <PublicationCell
+                            publications={row.publications}
+                            index={rowKey}
+                            onSelect={handlePublicationSelect}
                           />
-                          <td rowSpan={row.spans.material}>
-                            {row.technique || "-"}
-                          </td>
-                        </>
-                      )}
-                      {row.spans.precursor > 0 && (
-                        <td
-                          rowSpan={row.spans.precursor}
-                          dangerouslySetInnerHTML={{
-                            __html: formatChemicalFormula(row.precursor),
-                          }}
-                        />
-                      )}
-                      {row.spans.coreactant > 0 && (
-                        <td
-                          rowSpan={row.spans.coreactant}
-                          dangerouslySetInnerHTML={{
-                            __html: formatChemicalFormula(row.coreactant),
-                          }}
-                        />
-                      )}
-                      {row.spans.pretreatment > 0 && (
-                        <td rowSpan={row.spans.pretreatment}>
-                          {row.pretreatment}
                         </td>
-                      )}
-                      {row.spans.surface > 0 && (
-                        <td
-                          rowSpan={row.spans.surface}
-                          dangerouslySetInnerHTML={{
-                            __html: formatChemicalFormula(row.surface),
-                          }}
-                        />
-                      )}
-                      <td>
-                        <PublicationCell
-                          publications={row.publications}
-                          index={index}
-                          onSelect={handlePublicationSelect}
-                        />
-                      </td>
-                      <td>
-                        <DOICell publications={row.publications} />
-                      </td>
-                      <td>{renderActionButtons(row)}</td>
-                    </tr>
-                  ))}
+                        <td>
+                          <DOICell publications={row.publications} />
+                        </td>
+                        <td>{renderActionButtons(row)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
-
             {showChart && (
               <>
                 <div className="clear-button-container">
