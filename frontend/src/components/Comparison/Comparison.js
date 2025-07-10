@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
 import config from "../../config";
@@ -30,6 +30,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     rowData: null,
     publications: null,
   });
+  const [showPlots, setShowPlots] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -87,9 +88,9 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
   useEffect(() => {
     if (elementData.length > 0) {
-      if (elementData.some(row => !row.element)) {
-        setElementData(prev =>
-          prev.map(row => ({
+      if (elementData.some((row) => !row.element)) {
+        setElementData((prev) =>
+          prev.map((row) => ({
             ...row,
             element: row.element || element,
           }))
@@ -131,6 +132,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
           if (Object.keys(newReadings).length === 0) {
             setShowChart(false);
+            setShowPlots(false);
           }
 
           return newReadings;
@@ -180,12 +182,32 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     ].join("|");
   }
 
+  function renderChemicalFormula(formula) {
+    return formula.split(/(\s+)/).map((word, i) => {
+      const parts = [];
+      let lastIndex = 0;
+      const regex = /([A-Za-z\)])(\d+)/g;
+      let match;
+      while ((match = regex.exec(word)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(word.slice(lastIndex, match.index));
+        }
+        parts.push(match[1]);
+        parts.push(<sub key={i + '-' + match.index}>{match[2]}</sub>);
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < word.length) {
+        parts.push(word.slice(lastIndex));
+      }
+      return parts.length ? parts : word;
+    });
+  }
+
   const fetchDataForRow = (row, publication, compositeKey) => {
-    // Handle both old and new publication formats
     const publicationData = {
       author: publication.author,
-      journal: publication.journal || "", // Default empty for old format
-      year: publication.year || "", // Default empty for old format
+      journal: publication.journal || "",
+      year: publication.year || "",
       doi: publication.doi || "",
     };
 
@@ -221,6 +243,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           [compositeKey]: data,
         }));
         setShowChart(true);
+        setShowPlots(true);
       })
       .catch((err) => {
         console.error("Error fetching readings:", err);
@@ -228,10 +251,13 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
       });
   };
 
+  const handleCollapsePlots = () => {
+    setShowPlots(false);
+  };
+
   function getOptimallyMergedRows(data, columns) {
     if (!data.length) return [];
 
-    // Sort data by all columns in order for optimal merging
     const sorted = [...data].sort((a, b) => {
       for (const col of columns) {
         if ((a[col] || "") < (b[col] || "")) return -1;
@@ -261,7 +287,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
             }
           }
           if (parentSame && row[col] === prevValues[col]) {
-            // Merge with previous
             let prevIndex = i - 1;
             while (prevIndex >= 0 && mergedRows[prevIndex].spans[col] === 0) {
               prevIndex--;
@@ -304,449 +329,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     elementData,
     isSurfaceMode ? surfaceModeColumns : elementModeColumns
   );
-
-  const getMergedRows = (data) => {
-    const groupAndSort = (rows) => {
-      const groups = {};
-      rows.forEach((row) => {
-        if (!row || !row.material) return;
-
-        const materialTechKey = `${row.material}|${row.technique || ""}`;
-
-        if (!groups[materialTechKey]) {
-          groups[materialTechKey] = {
-            material: row.material,
-            technique: row.technique || "",
-            precursors: {},
-          };
-        }
-
-        const precursor = row.precursor || "";
-        const coreactant = row.coreactant || "";
-        const pretreatment = row.pretreatment || "";
-        const surface = row.surface || "";
-
-        if (!groups[materialTechKey].precursors[precursor]) {
-          groups[materialTechKey].precursors[precursor] = {};
-        }
-
-        if (!groups[materialTechKey].precursors[precursor][coreactant]) {
-          groups[materialTechKey].precursors[precursor][coreactant] = {};
-        }
-
-        if (
-          !groups[materialTechKey].precursors[precursor][coreactant][
-            pretreatment
-          ]
-        ) {
-          groups[materialTechKey].precursors[precursor][coreactant][
-            pretreatment
-          ] = [];
-        }
-
-        if (
-          !groups[materialTechKey].precursors[precursor][coreactant][
-            pretreatment
-          ][surface]
-        ) {
-          groups[materialTechKey].precursors[precursor][coreactant][
-            pretreatment
-          ][surface] = [];
-        }
-
-        groups[materialTechKey].precursors[precursor][coreactant][pretreatment][
-          surface
-        ].push(row);
-      });
-
-      return groups;
-    };
-
-    const flattenGroups = (groups) => {
-      const result = [];
-
-      Object.entries(groups).forEach(([materialKey, materialData]) => {
-        if (!materialData || !materialData.precursors) return;
-
-        Object.entries(materialData.precursors).forEach(
-          ([precursor, coreactants]) => {
-            if (!coreactants) return;
-
-            Object.entries(coreactants).forEach(
-              ([coreactant, pretreatments]) => {
-                if (!pretreatments) return;
-
-                Object.entries(pretreatments).forEach(
-                  ([pretreatment, surfaces]) => {
-                    if (!surfaces) return;
-
-                    Object.entries(surfaces).forEach(([surface, rows]) => {
-                      if (!Array.isArray(rows)) return;
-
-                      rows.forEach((row) => {
-                        if (!row) return;
-
-                        result.push({
-                          ...row,
-                          material: materialData.material,
-                          technique: materialData.technique,
-                          precursor,
-                          coreactant,
-                          pretreatment,
-                          surface,
-                        });
-                      });
-                    });
-                  }
-                );
-              }
-            );
-          }
-        );
-      });
-
-      return result;
-    };
-
-    const groupedData = groupAndSort(data);
-    const orderedData = flattenGroups(groupedData);
-
-    // Calculate spans for the reordered data
-    const mergedData = [];
-    let currentRowSpans = {
-      materialTech: 1,
-      precursor: 1,
-      coreactant: 1,
-      pretreatment: 1,
-      surface: 1,
-    };
-    let previousValues = {
-      materialTech: `${orderedData[0].material}|${orderedData[0].technique}`,
-      precursor: orderedData[0].precursor,
-      coreactant: orderedData[0].coreactant,
-      pretreatment: orderedData[0].pretreatment,
-      surface: orderedData[0].surface,
-    };
-
-    // Add first row
-    mergedData.push({
-      ...orderedData[0],
-      spans: {
-        material: 1,
-        precursor: 1,
-        coreactant: 1,
-        pretreatment: 1,
-        surface: 1,
-      },
-    });
-
-    // Process remaining rows
-    for (let i = 1; i < orderedData.length; i++) {
-      const row = orderedData[i];
-      const newRow = { ...row, spans: {} };
-      const currentMaterialTech = `${row.material}|${row.technique}`;
-      if (currentMaterialTech === previousValues.materialTech) {
-        mergedData[mergedData.length - currentRowSpans.materialTech].spans
-          .material++;
-        newRow.spans.material = 0;
-        currentRowSpans.materialTech++;
-      } else {
-        newRow.spans.material = 1;
-        currentRowSpans.materialTech = 1;
-        previousValues.materialTech = currentMaterialTech;
-        currentRowSpans.precursor = 1;
-        currentRowSpans.coreactant = 1;
-        currentRowSpans.pretreatment = 1;
-        currentRowSpans.surface = 1;
-      }
-
-      if (
-        row.precursor === previousValues.precursor &&
-        newRow.spans.material === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.precursor].spans
-          .precursor++;
-        newRow.spans.precursor = 0;
-        currentRowSpans.precursor++;
-      } else {
-        newRow.spans.precursor = 1;
-        currentRowSpans.precursor = 1;
-        previousValues.precursor = row.precursor;
-        // Reset dependent spans
-        currentRowSpans.coreactant = 1;
-        currentRowSpans.pretreatment = 1;
-        currentRowSpans.surface = 1;
-      }
-
-      if (
-        row.coreactant === previousValues.coreactant &&
-        newRow.spans.precursor === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.coreactant].spans
-          .coreactant++;
-        newRow.spans.coreactant = 0;
-        currentRowSpans.coreactant++;
-      } else {
-        newRow.spans.coreactant = 1;
-        currentRowSpans.coreactant = 1;
-        previousValues.coreactant = row.coreactant;
-        // Reset dependent spans
-        currentRowSpans.pretreatment = 1;
-        currentRowSpans.surface = 1;
-      }
-
-      if (
-        row.pretreatment === previousValues.pretreatment &&
-        newRow.spans.coreactant === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.pretreatment].spans
-          .pretreatment++;
-        newRow.spans.pretreatment = 0;
-        currentRowSpans.pretreatment++;
-      } else {
-        newRow.spans.pretreatment = 1;
-        currentRowSpans.pretreatment = 1;
-        previousValues.pretreatment = row.pretreatment;
-        currentRowSpans.surface = 1;
-      }
-
-      if (
-        row.surface === previousValues.surface &&
-        newRow.spans.pretreatment === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.surface].spans.surface++;
-        newRow.spans.surface = 0;
-        currentRowSpans.surface++;
-      } else {
-        newRow.spans.surface = 1;
-        currentRowSpans.surface = 1;
-        previousValues.surface = row.surface;
-      }
-
-      mergedData.push(newRow);
-    }
-
-    return mergedData;
-  };
-
-  const getMergedRowsSurfaceMode = (data) => {
-    const groupAndSort = (rows) => {
-      const groups = {};
-      rows.forEach((row) => {
-        if (!row || !row.surface) return;
-
-        const surfaceKey = row.surface;
-        if (!groups[surfaceKey]) {
-          groups[surfaceKey] = { surface: row.surface, materialTechs: {} };
-        }
-        const materialTechKey = `${row.material || ""}|${row.technique || ""}`;
-        if (!groups[surfaceKey].materialTechs[materialTechKey]) {
-          groups[surfaceKey].materialTechs[materialTechKey] = {
-            material: row.material,
-            technique: row.technique || "",
-            precursors: {},
-          };
-        }
-        const precursor = row.precursor || "";
-        if (!groups[surfaceKey].materialTechs[materialTechKey][precursor]) {
-          groups[surfaceKey].materialTechs[materialTechKey][precursor] = {};
-        }
-        const coreactant = row.coreactant || "";
-        if (
-          !groups[surfaceKey].materialTechs[materialTechKey][precursor][
-            coreactant
-          ]
-        ) {
-          groups[surfaceKey].materialTechs[materialTechKey][precursor][
-            coreactant
-          ] = {};
-        }
-        const pretreatment = row.pretreatment || "";
-        if (
-          !groups[surfaceKey].materialTechs[materialTechKey][precursor][
-            coreactant
-          ][pretreatment]
-        ) {
-          groups[surfaceKey].materialTechs[materialTechKey][precursor][
-            coreactant
-          ][pretreatment] = [];
-        }
-        groups[surfaceKey].materialTechs[materialTechKey][precursor][
-          coreactant
-        ][pretreatment].push(row);
-      });
-      return groups;
-    };
-
-    const flattenGroups = (groups) => {
-      const result = [];
-
-      Object.entries(groups).forEach(([surface, surfaceData]) => {
-        Object.entries(surfaceData.materialTechs).forEach(
-          ([materialTechKey, materialTechData]) => {
-            Object.entries(materialTechData.precursors).forEach(
-              ([precursor, coreactants]) => {
-                Object.entries(coreactants).forEach(
-                  ([coreactant, pretreatments]) => {
-                    Object.entries(pretreatments).forEach(
-                      ([pretreatment, rows]) => {
-                        rows.forEach((row) => {
-                          result.push({
-                            ...row,
-                            surface,
-                            material: materialTechData.material,
-                            technique: materialTechData.technique,
-                            precursor,
-                            coreactant,
-                            pretreatment,
-                          });
-                        });
-                      }
-                    );
-                  }
-                );
-              }
-            );
-          }
-        );
-      });
-      return result;
-    };
-
-    const groupedData = groupAndSort(data);
-    const orderedData = flattenGroups(groupedData);
-
-    if (!orderedData.length) return [];
-
-    const mergedData = [];
-    let currentRowSpans = {
-      surface: 1,
-      materialTech: 1,
-      precursor: 1,
-      coreactant: 1,
-      pretreatment: 1,
-    };
-    let previousValues = {
-      surface: orderedData[0]?.surface,
-      materialTech: `${orderedData[0].material}|${orderedData[0].technique}`,
-      precursor: orderedData[0]?.precursor,
-      coreactant: orderedData[0]?.coreactant,
-      pretreatment: orderedData[0]?.pretreatment,
-    };
-
-    mergedData.push({
-      ...orderedData[0],
-      spans: {
-        surface: 1,
-        material: 1,
-        technique: 1,
-        precursor: 1,
-        coreactant: 1,
-        pretreatment: 1,
-      },
-    });
-
-    for (let i = 1; i < orderedData.length; i++) {
-      const row = orderedData[i];
-      const newRow = { ...row, spans: {} };
-      const currentMaterialTech = `${row.material}|${row.technique}`;
-
-      if (row.surface === previousValues.surface) {
-        mergedData[mergedData.length - currentRowSpans.surface].spans.surface++;
-        newRow.spans.surface = 0;
-        currentRowSpans.surface++;
-      } else {
-        newRow.spans.surface = 1;
-        currentRowSpans.surface = 1;
-        previousValues.surface = row.surface;
-        currentRowSpans.materialTech = 1;
-        currentRowSpans.precursor = 1;
-        currentRowSpans.coreactant = 1;
-        currentRowSpans.pretreatment = 1;
-      }
-
-      if (
-        currentMaterialTech === previousValues.materialTech &&
-        newRow.spans.surface === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.materialTech].spans
-          .material++;
-        mergedData[mergedData.length - currentRowSpans.materialTech].spans
-          .technique++;
-        newRow.spans.material = 0;
-        newRow.spans.technique = 0;
-        currentRowSpans.materialTech++;
-      } else {
-        newRow.spans.material = 1;
-        newRow.spans.technique = 1;
-        currentRowSpans.materialTech = 1;
-        previousValues.materialTech = currentMaterialTech;
-        currentRowSpans.precursor = 1;
-        currentRowSpans.coreactant = 1;
-        currentRowSpans.pretreatment = 1;
-      }
-
-      if (
-        row.precursor === previousValues.precursor &&
-        newRow.spans.material === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.precursor].spans
-          .precursor++;
-        newRow.spans.precursor = 0;
-        currentRowSpans.precursor++;
-      } else {
-        newRow.spans.precursor = 1;
-        currentRowSpans.precursor = 1;
-        previousValues.precursor = row.precursor;
-        currentRowSpans.coreactant = 1;
-        currentRowSpans.pretreatment = 1;
-      }
-
-      if (
-        row.coreactant === previousValues.coreactant &&
-        newRow.spans.precursor === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.coreactant].spans
-          .coreactant++;
-        newRow.spans.coreactant = 0;
-        currentRowSpans.coreactant++;
-      } else {
-        newRow.spans.coreactant = 1;
-        currentRowSpans.coreactant = 1;
-        previousValues.coreactant = row.coreactant;
-        currentRowSpans.pretreatment = 1;
-      }
-
-      if (
-        row.pretreatment === previousValues.pretreatment &&
-        newRow.spans.coreactant === 0
-      ) {
-        mergedData[mergedData.length - currentRowSpans.pretreatment].spans
-          .pretreatment++;
-        newRow.spans.pretreatment = 0;
-        currentRowSpans.pretreatment++;
-      } else {
-        newRow.spans.pretreatment = 1;
-        currentRowSpans.pretreatment = 1;
-        previousValues.pretreatment = row.pretreatment;
-      }
-
-      mergedData.push(newRow);
-    }
-
-    return mergedData;
-  };
-
-  const formatChemicalFormula = (value) => {
-    if (typeof value !== "string") return value;
-
-    if (/\s|\(|\)/.test(value)) return value;
-
-    return value.replace(
-      /([A-Za-z])(\d+)/g,
-      (match, p1, p2) => `${p1}<sub>${p2}</sub>`
-    );
-  };
 
   const handleDOIClick = (doi) => {
     if (!doi) return;
@@ -815,6 +397,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     setSelectedPublications({});
     setReadings({});
     setShowChart(false);
+    setShowPlots(false);
   };
 
   const calculateAxisRanges = () => {
@@ -848,7 +431,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const combinedData = () => {
     if (Object.keys(readings).length === 0) return [];
 
-    // Collect all unique cycles
     const allCycles = new Set();
     Object.values(readings).forEach((arr) => {
       if (Array.isArray(arr)) {
@@ -856,7 +438,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
       }
     });
 
-    // For each cycle, build an object with all composite keys
     return Array.from(allCycles)
       .sort((a, b) => a - b)
       .map((cycle) => {
@@ -886,22 +467,18 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         if (!Array.isArray(rowReadings) || rowReadings.length === 0)
           return null;
 
-        // Extract rowKey and author from compositeKey
         const lastDash = compositeKey.lastIndexOf("-");
         const rowKey = compositeKey.substring(0, lastDash);
         const authorName = compositeKey.substring(lastDash + 1);
 
-        // Find the correct row in mergedRows
         const row = mergedRows.find((r) => getRowKey(r) === rowKey);
         if (!row) return null;
 
-        // Find the matching publication
         const publication = row.publications.find(
           (pub) => pub.author === authorName
         );
         if (!publication) return null;
 
-        // Create display name based on available fields
         const displayName = `${row.surface} (${publication.author}${
           publication.journal ? `, ${publication.journal}` : ""
         }${publication.year ? ` ${publication.year}` : ""})`;
@@ -933,13 +510,11 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const calculateSelectivity = () => {
     const selectedReadings = Object.values(readings);
 
-    // Check if we have exactly 2 sets of readings
     if (selectedReadings.length !== 2) {
       setSelectivityData([]);
       return;
     }
 
-    // Ensure both data sets are arrays
     const [data1, data2] = selectedReadings;
     if (!Array.isArray(data1) || !Array.isArray(data2)) {
       console.error("Invalid data format for selectivity calculation");
@@ -949,7 +524,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
     const selectivityPoints = [];
 
-    // Create Sets of cycles from both data sets
     const cycles1 = new Set(data1.map((r) => r.cycles));
     const cycles2 = new Set(data2.map((r) => r.cycles));
     const commonCycles = [...cycles1].filter((cycle) => cycles2.has(cycle));
@@ -1051,7 +625,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
       });
 
       if (response.ok) {
-        // Refresh data
         window.location.reload();
       } else {
         const error = await response.json();
@@ -1106,299 +679,319 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                 {error}
               </div>
             )}
-            <div className="table-container">
-              <table className={isSurfaceMode ? "surface-mode-table" : ""}>
-                <thead>
-                  <tr>
-                    {isSurfaceMode ? (
-                      <>
-                        <th>Surface</th>
-                        <th>Material</th>
-                        <th>Technique</th>
-                        <th>Precursor</th>
-                        <th>Co-reactant</th>
-                        <th>Pretreatment</th>
-                        <th>Dataset</th>
-                        <th>Publication</th>
-                        <th>Edit</th>
-                      </>
-                    ) : (
-                      <>
-                        <th>Material</th>
-                        <th>Technique</th>
-                        <th>Precursor</th>
-                        <th>Co-reactant</th>
-                        <th>Pretreatment</th>
-                        <th>Surface</th>
-                        <th>Dataset</th>
-                        <th>Publication</th>
-                        <th>Edit</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {mergedRows.map((row) => {
-                    const rowKey = getRowKey(row);
-                    return (
-                      <tr key={rowKey}>
-                        {!isSurfaceMode ? (
+            <div className={`main-content ${showPlots ? "with-plots" : ""}`}>
+              <div className={`table-section ${showPlots ? "with-plots" : ""}`}>
+                <div className="table-container">
+                  <table className={isSurfaceMode ? "surface-mode-table" : ""}>
+                    <thead>
+                      <tr>
+                        {isSurfaceMode ? (
                           <>
-                            {row.spans.material > 0 && (
-                              <td rowSpan={row.spans.material}>
-                                {row.material}
-                              </td>
-                            )}
-                            {row.spans.technique > 0 && (
-                              <td rowSpan={row.spans.technique}>
-                                {row.technique}
-                              </td>
-                            )}
-                            {row.spans.precursor > 0 && (
-                              <td rowSpan={row.spans.precursor}>
-                                {row.precursor}
-                              </td>
-                            )}
-                            {row.spans.coreactant > 0 && (
-                              <td rowSpan={row.spans.coreactant}>
-                                {row.coreactant}
-                              </td>
-                            )}
-                            {row.spans.pretreatment > 0 && (
-                              <td rowSpan={row.spans.pretreatment}>
-                                {row.pretreatment}
-                              </td>
-                            )}
-                            {row.spans.surface > 0 && (
-                              <td rowSpan={row.spans.surface}>{row.surface}</td>
-                            )}
+                            <th>Surface</th>
+                            <th>Material</th>
+                            <th>Technique</th>
+                            <th>Precursor</th>
+                            <th>Co-reactant</th>
+                            <th>Pretreatment</th>
+                            <th>Dataset</th>
+                            <th>Publication</th>
+                            <th>Edit</th>
                           </>
                         ) : (
                           <>
-                            {row.spans.surface > 0 && (
-                              <td rowSpan={row.spans.surface}>{row.surface}</td>
-                            )}
-                            {row.spans.material > 0 && (
-                              <td rowSpan={row.spans.material}>
-                                {row.material}
-                              </td>
-                            )}
-                            {row.spans.technique > 0 && (
-                              <td rowSpan={row.spans.technique}>
-                                {row.technique}
-                              </td>
-                            )}
-                            {row.spans.precursor > 0 && (
-                              <td rowSpan={row.spans.precursor}>
-                                {row.precursor}
-                              </td>
-                            )}
-                            {row.spans.coreactant > 0 && (
-                              <td rowSpan={row.spans.coreactant}>
-                                {row.coreactant}
-                              </td>
-                            )}
-                            {row.spans.pretreatment > 0 && (
-                              <td rowSpan={row.spans.pretreatment}>
-                                {row.pretreatment}
-                              </td>
-                            )}
+                            <th>Material</th>
+                            <th>Technique</th>
+                            <th>Precursor</th>
+                            <th>Co-reactant</th>
+                            <th>Pretreatment</th>
+                            <th>Surface</th>
+                            <th>Dataset</th>
+                            <th>Publication</th>
+                            <th>Edit</th>
                           </>
                         )}
-                        <td>
-                          <PublicationCell
-                            publications={row.publications}
-                            index={rowKey}
-                            onSelect={handlePublicationSelect}
-                          />
-                        </td>
-                        <td>
-                          <DOICell publications={row.publications} />
-                        </td>
-                        <td>{renderActionButtons(row)}</td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {showChart && (
-              <>
-                <div className="clear-button-container">
-                  <button
-                    className="clear-button"
-                    onClick={handleClearSelections}
-                  >
-                    <span>🗑️</span>
-                    Clear Choices
-                  </button>
+                    </thead>
+                    <tbody>
+                      {mergedRows.map((row) => {
+                        const rowKey = getRowKey(row);
+                        return (
+                          <tr key={rowKey}>
+                            {!isSurfaceMode ? (
+                              <>
+                                {row.spans.material > 0 && (
+                                  <td rowSpan={row.spans.material}>
+                                    {renderChemicalFormula(row.material)}
+                                  </td>
+                                )}
+                                {row.spans.technique > 0 && (
+                                  <td rowSpan={row.spans.technique}>
+                                    {renderChemicalFormula(row.technique)}
+                                  </td>
+                                )}
+                                {row.spans.precursor > 0 && (
+                                  <td rowSpan={row.spans.precursor}>
+                                    {renderChemicalFormula(row.precursor)}
+                                  </td>
+                                )}
+                                {row.spans.coreactant > 0 && (
+                                  <td rowSpan={row.spans.coreactant}>
+                                    {renderChemicalFormula(row.coreactant)}
+                                  </td>
+                                )}
+                                {row.spans.pretreatment > 0 && (
+                                  <td rowSpan={row.spans.pretreatment}>
+                                    {renderChemicalFormula(row.pretreatment)}
+                                  </td>
+                                )}
+                                {row.spans.surface > 0 && (
+                                  <td rowSpan={row.spans.surface}>
+                                    {renderChemicalFormula(row.surface)}
+                                  </td>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {row.spans.surface > 0 && (
+                                  <td rowSpan={row.spans.surface}>
+                                    {renderChemicalFormula(row.surface)}
+                                  </td>
+                                )}
+                                {row.spans.material > 0 && (
+                                  <td rowSpan={row.spans.material}>
+                                    {renderChemicalFormula(row.material)}
+                                  </td>
+                                )}
+                                {row.spans.technique > 0 && (
+                                  <td rowSpan={row.spans.technique}>
+                                    {renderChemicalFormula(row.technique)}
+                                  </td>
+                                )}
+                                {row.spans.precursor > 0 && (
+                                  <td rowSpan={row.spans.precursor}>
+                                    {renderChemicalFormula(row.precursor)}
+                                  </td>
+                                )}
+                                {row.spans.coreactant > 0 && (
+                                  <td rowSpan={row.spans.coreactant}>
+                                    {renderChemicalFormula(row.coreactant)}
+                                  </td>
+                                )}
+                                {row.spans.pretreatment > 0 && (
+                                  <td rowSpan={row.spans.pretreatment}>
+                                    {renderChemicalFormula(row.pretreatment)}
+                                  </td>
+                                )}
+                              </>
+                            )}
+                            <td>
+                              <PublicationCell
+                                publications={row.publications}
+                                index={rowKey}
+                                onSelect={handlePublicationSelect}
+                              />
+                            </td>
+                            <td>
+                              <DOICell publications={row.publications} />
+                            </td>
+                            <td>{renderActionButtons(row)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="charts-wrapper">
-                  <div className="chart-container">
-                    <h3>Cycle vs Thickness</h3>
-                    <ResponsiveContainer width="100%" height={500}>
-                      <LineChart
-                        data={combinedData()}
-                        margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          strokeWidth={1.5}
-                        />
-                        <XAxis
-                          dataKey="cycle"
-                          type="number"
-                          domain={calculateAxisRanges().cycleDomain}
-                          ticks={Array.from(
-                            {
-                              length:
-                                Math.floor(
-                                  calculateAxisRanges().cycleDomain[1] /
-                                    calculateAxisRanges().cycleInterval
-                                ) + 1,
-                            },
-                            (_, i) => i * calculateAxisRanges().cycleInterval
-                          )}
-                          tick={{ fontSize: 20, fontWeight: 500 }}
-                          label={{
-                            value: "Number of Cycles",
-                            position: "bottom",
-                            offset: 0,
-                            fontSize: 22,
-                            fontWeight: 600,
-                          }}
-                          stroke="#666"
-                          strokeWidth={2}
-                        />
-                        <YAxis
-                          label={{
-                            value: "Thickness (nm)",
-                            angle: -90,
-                            position: "insideLeft",
-                            offset: 10,
-                            fontSize: 22,
-                            fontWeight: 600,
-                          }}
-                          domain={calculateAxisRanges().thicknessDomain}
-                          stroke="#666"
-                          strokeWidth={2}
-                          tick={{ fontSize: 20, fontWeight: 500 }}
-                          ticks={Array.from(
-                            {
-                              length:
-                                Math.floor(
-                                  calculateAxisRanges().thicknessDomain[1] /
-                                    calculateAxisRanges().thicknessInterval
-                                ) + 1,
-                            },
-                            (_, i) =>
-                              i * calculateAxisRanges().thicknessInterval
-                          )}
-                        />
-                        <Tooltip
-                          formatter={(value, name) => {
-                            const [index, author] = name.split("-");
-                            return [`${value.toFixed(2)} nm`, author];
-                          }}
-                          labelFormatter={(value) => `Cycles: ${value}`}
-                        />
-                        <Legend
-                          verticalAlign="bottom"
-                          align="center"
-                          layout="horizontal"
-                          wrapperStyle={{
-                            position: "relative",
-                            marginTop: "20px",
-                            width: "100%",
-                          }}
-                          content={({ payload }) => {
-                            if (!payload) return null;
-                            return (
-                              <div className="chart-legend-container">
-                                {payload.map((entry, index) => (
-                                  <div key={index} className="legend-item">
-                                    <div
-                                      className="legend-line"
-                                      style={{ backgroundColor: entry.color }}
-                                    />
-                                    <span className="legend-text">
-                                      {entry.value}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          }}
-                        />
-                        {renderLines()}
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <div style={{ height: "100px" }} />
+              </div>
+
+              {showPlots && (
+                <div className="plots-section">
+                  <div className="plots-header">
+                    <button
+                      className="collapse-plots-btn"
+                      onClick={handleCollapsePlots}
+                    >
+                      <span>✕</span>
+                      Collapse Plots
+                    </button>
+                    <button
+                      className="clear-button"
+                      onClick={handleClearSelections}
+                    >
+                      <span>🗑️</span>
+                      Clear Choices
+                    </button>
                   </div>
-                  {selectivityData.length > 0 && (
+                  <div className="plots-container">
                     <div className="chart-container">
-                      <h3>Selectivity</h3>
-                      <ResponsiveContainer width="100%" height={500}>
+                      <h3>Cycle vs Thickness</h3>
+                      <ResponsiveContainer width="100%" height={400}>
                         <LineChart
-                          data={selectivityData}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                          data={combinedData()}
+                          margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
                         >
                           <CartesianGrid
                             strokeDasharray="3 3"
                             strokeWidth={1.5}
                           />
                           <XAxis
-                            dataKey="thickness"
+                            dataKey="cycle"
                             type="number"
-                            stroke="#666"
-                            strokeWidth={2}
+                            domain={calculateAxisRanges().cycleDomain}
+                            ticks={Array.from(
+                              {
+                                length:
+                                  Math.floor(
+                                    calculateAxisRanges().cycleDomain[1] /
+                                      calculateAxisRanges().cycleInterval
+                                  ) + 1,
+                              },
+                              (_, i) => i * calculateAxisRanges().cycleInterval
+                            )}
                             tick={{ fontSize: 16, fontWeight: 500 }}
                             label={{
-                              value: "Thickness of Thicker Film (nm)",
+                              value: "Number of Cycles",
                               position: "bottom",
                               offset: 0,
                               fontSize: 18,
                               fontWeight: 600,
                             }}
-                          />
-                          <YAxis
                             stroke="#666"
                             strokeWidth={2}
-                            tick={{ fontSize: 16, fontWeight: 500 }}
+                          />
+                          <YAxis
                             label={{
-                              value: "Selectivity",
+                              value: "Thickness (nm)",
                               angle: -90,
                               position: "insideLeft",
                               offset: 10,
                               fontSize: 18,
                               fontWeight: 600,
                             }}
-                            domain={[0, 1]}
+                            domain={calculateAxisRanges().thicknessDomain}
+                            stroke="#666"
+                            strokeWidth={2}
+                            tick={{ fontSize: 16, fontWeight: 500 }}
+                            ticks={Array.from(
+                              {
+                                length:
+                                  Math.floor(
+                                    calculateAxisRanges().thicknessDomain[1] /
+                                      calculateAxisRanges().thicknessInterval
+                                  ) + 1,
+                              },
+                              (_, i) =>
+                                i * calculateAxisRanges().thicknessInterval
+                            )}
                           />
                           <Tooltip
-                            formatter={(value) => value.toFixed(3)}
-                            labelFormatter={(value) => `Cycle: ${value}`}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="selectivity"
-                            stroke="#ff7300"
-                            dot={{
-                              fill: "#ff7300",
-                              r: 8,
-                              strokeWidth: 2,
-                              stroke: "#fff",
+                            formatter={(value, name) => {
+                              const [index, author] = name.split("-");
+                              return [`${value.toFixed(2)} nm`, author];
                             }}
-                            strokeWidth={4}
-                            connectNulls={true}
+                            labelFormatter={(value) => `Cycles: ${value}`}
                           />
+                          <Legend
+                            verticalAlign="bottom"
+                            align="center"
+                            layout="horizontal"
+                            wrapperStyle={{
+                              position: "relative",
+                              marginTop: "20px",
+                              width: "100%",
+                            }}
+                            content={({ payload }) => {
+                              if (!payload) return null;
+                              return (
+                                <div className="chart-legend-container">
+                                  {payload.map((entry, index) => (
+                                    <div key={index} className="legend-item">
+                                      <div
+                                        className="legend-line"
+                                        style={{ backgroundColor: entry.color }}
+                                      />
+                                      <span className="legend-text">
+                                        {entry.value}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }}
+                          />
+                          {renderLines()}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  )}
+                    {selectivityData.length > 0 && (
+                      <div className="chart-container">
+                        <h3>Selectivity</h3>
+                        <ResponsiveContainer width="100%" height={400}>
+                          <LineChart
+                            data={selectivityData}
+                            margin={{
+                              top: 20,
+                              right: 30,
+                              left: 20,
+                              bottom: 20,
+                            }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              strokeWidth={1.5}
+                            />
+                            <XAxis
+                              dataKey="thickness"
+                              type="number"
+                              stroke="#666"
+                              strokeWidth={2}
+                              tick={{ fontSize: 16, fontWeight: 500 }}
+                              label={{
+                                value: "Thickness of Thicker Film (nm)",
+                                position: "bottom",
+                                offset: 0,
+                                fontSize: 18,
+                                fontWeight: 600,
+                              }}
+                            />
+                            <YAxis
+                              stroke="#666"
+                              strokeWidth={2}
+                              tick={{ fontSize: 16, fontWeight: 500 }}
+                              label={{
+                                value: "Selectivity",
+                                angle: -90,
+                                position: "insideLeft",
+                                offset: 10,
+                                fontSize: 18,
+                                fontWeight: 600,
+                              }}
+                              domain={[0, 1]}
+                            />
+                            <Tooltip
+                              formatter={(value) => value.toFixed(3)}
+                              labelFormatter={(value) => `Cycle: ${value}`}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="selectivity"
+                              stroke="#ff7300"
+                              dot={{
+                                fill: "#ff7300",
+                                r: 8,
+                                strokeWidth: 2,
+                                stroke: "#fff",
+                              }}
+                              strokeWidth={4}
+                              connectNulls={true}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>

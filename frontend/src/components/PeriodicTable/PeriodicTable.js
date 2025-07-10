@@ -36,7 +36,17 @@ const PeriodicTable = ({ type, endpoint }) => {
     const element = periodicTableElements[position];
     if (!element) return <div className="element empty" />;
 
-    const hasData = elementsWithData.has(element.symbol);
+    let hasData = false;
+    if (type === "material") {
+      hasData = elementsWithData.has(element.symbol);
+    } else {
+      hasData = Array.from(elementsWithData).some((surface) =>
+        surface === element.symbol ||
+        (surface.startsWith(element.symbol) &&
+          (surface.length === element.symbol.length ||
+            !/[a-z]/.test(surface[element.symbol.length])))
+      );
+    }
 
     return (
       <button

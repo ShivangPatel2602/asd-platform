@@ -7,7 +7,6 @@
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   width: 100%;
-  overflow-x: auto;
 }
 
 table {
@@ -17,11 +16,19 @@ table {
   table-layout: fixed;
 }
 
+/* Ensure table maintains fixed column widths in all modes */
+table {
+  table-layout: fixed;
+}
+
 th,
 td {
   padding: 12px;
   text-align: left;
   border: 1px solid #ddd;
+  white-space: normal;      
+  word-break: break-word;  
+  overflow-wrap: anywhere;
 }
 
 th:nth-child(1) {
@@ -56,20 +63,19 @@ th {
   background-color: #f4f4f4;
 }
 
-.surface-mode-table th:nth-child(1) { width: 12%; }   
-.surface-mode-table th:nth-child(2) { width: 6%; }  
-.surface-mode-table th:nth-child(3) { width: 5%; }    
-.surface-mode-table th:nth-child(4) { width: 17%; }   
-.surface-mode-table th:nth-child(5) { width: 8%; }  
-.surface-mode-table th:nth-child(6) { width: 17%; }   
-.surface-mode-table th:nth-child(7) { width: 17%; }  
-.surface-mode-table th:nth-child(8) { width: 10%; } 
-.surface-mode-table th:nth-child(9) { width: 10%; }   
+.surface-mode-table th:nth-child(1) { width: 100px; }   
+.surface-mode-table th:nth-child(2) { width: 120px; }  
+.surface-mode-table th:nth-child(3) { width: 60px; }    
+.surface-mode-table th:nth-child(4) { width: 120px; }   
+.surface-mode-table th:nth-child(5) { width: 180px; }  
+.surface-mode-table th:nth-child(6) { width: 100px; }   
+.surface-mode-table th:nth-child(7) { width: 200px; }  
+.surface-mode-table th:nth-child(8) { width: 140px; } 
+.surface-mode-table th:nth-child(9) { width: 100px; }   
 
 table td[rowspan] {
   background-color: #f8fafc;
   vertical-align: middle;
-  /* text-align: center; */
   border-right: 2px solid #e2e8f0;
   transition: background-color 0.2s ease;
 }
@@ -502,4 +508,134 @@ td sub {
 .delete-publications-button span {
   font-size: 1.2rem;
   line-height: 1;
+}
+
+.highlighted-row {
+  background-color: #fffbe6 !important;
+  transition: background-color 0.5s;
+}
+.scroll-to-row-btn {
+  padding: 10px 20px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.scroll-to-row-btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.main-content {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.main-content.with-plots {
+  display: flex;
+}
+
+.table-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.table-section.with-plots {
+  flex: 0 0 60%;
+  max-width: 60%;
+}
+
+.table-section.with-plots .table-container {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.table-section.with-plots table {
+  min-width: 1200px; /* Ensure table maintains its full width */
+  width: 1200px; /* Force table to maintain exact width */
+  table-layout: fixed; /* Prevent column width changes */
+}
+
+.plots-section {
+  flex: 0 0 40%;
+  max-width: 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.plots-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+.collapse-plots-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.collapse-plots-btn:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2);
+}
+
+.plots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.plots-container .chart-container {
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.plots-container .chart-container h3 {
+  margin-bottom: 10px;
+  color: #1f2937;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+@media (max-width: 1200px) {
+  .main-content.with-plots {
+    flex-direction: column;
+  }
+  
+  .table-section.with-plots {
+    flex: 1;
+    max-width: 100%;
+  }
+  
+  .plots-section {
+    flex: 1;
+    max-width: 100%;
+  }
 }
