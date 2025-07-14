@@ -804,7 +804,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
               </div>
 
               {showPlots && (
-                <div className="plots-section">
+                <div className={`plots-section${showPlots ? " with-plots" : ""}`}>
                   <div className="plots-header">
                     <button
                       className="collapse-plots-btn"

@@ -567,6 +567,7 @@ td sub {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  transform: translateY(20px)
 }
 
 .plots-header {
@@ -639,3 +640,37 @@ td sub {
     max-width: 100%;
   }
 }
+
+.main-content {
+  display: flex;
+  width: 100%;
+}
+
+.table-section {
+  flex-basis: 100%;
+  max-width: 100%;
+  transition: flex-basis 0.5s cubic-bezier(0.4,0,0.2,1), max-width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+
+.table-section.with-plots {
+  flex-basis: 60%;
+  max-width: 60%;
+}
+
+.plots-section {
+  flex-basis: 0;
+  max-width: 0;
+  opacity: 0;
+  transition: flex-basis 0.5s cubic-bezier(0.4,0,0.2,1), max-width 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.5s;
+  overflow: hidden;
+}
+
+.plots-section.with-plots {
+  flex-basis: 40%;
+  max-width: 40%;
+  opacity: 1;
+  transform: none;
+  transition: flex-basis 0.5s cubic-bezier(0.4,0,0.2,1), max-width 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.5s, transform 0.5s;
+}
+
+
