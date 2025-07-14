@@ -64,14 +64,29 @@ function App() {
         <Route
           path="/"
           element={
-            <LandingPage setUser={setUser} isAuthorized={isAuthorized} user={user} />
+            user ? (
+              <LandingPage
+                setUser={setUser}
+                isAuthorized={isAuthorized}
+                user={user}
+              />
+            ) : (
+              <LoginPage />
+            )
           }
         />
-        <Route path="/login" element={<LoginPage />} />
         <Route
           path="/comparison"
           element={
-            <MaterialSelector setUser={setUser} isAuthorized={isAuthorized} user={user} />
+            user ? (
+              <MaterialSelector
+                setUser={setUser}
+                isAuthorized={isAuthorized}
+                user={user}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
         <Route
@@ -84,7 +99,7 @@ function App() {
                 isAuthorized={isAuthorized}
               />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to="/" replace />
             )
           }
         />
@@ -94,7 +109,7 @@ function App() {
             user && isAuthorized ? (
               <SubmissionReview setUser={setUser} isAuthorized={isAuthorized} />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to="/" replace />
             )
           }
         />
@@ -102,9 +117,13 @@ function App() {
           path="/edit-data/:element"
           element={
             user ? (
-              <EditData setUser={setUser} isAuthorized={isAuthorized} user={user} />
+              <EditData
+                setUser={setUser}
+                isAuthorized={isAuthorized}
+                user={user}
+              />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to="/" replace />
             )
           }
         />
