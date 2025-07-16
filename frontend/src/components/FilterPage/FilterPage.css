@@ -1,0 +1,20 @@
+.filter-page-container {
+  max-width: 800px;
+  margin: 60px auto;
+  padding: 40px 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.filter-page-container h1 {
+  font-size: 2rem;
+  color: #2563eb;
+  margin-bottom: 18px;
+}
+
+.filter-page-container p {
+  color: #64748b;
+  font-size: 1.1rem;
+}

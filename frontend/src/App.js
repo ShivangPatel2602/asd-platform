@@ -12,6 +12,9 @@ import FormInput from "./components/Form/FormInput";
 import MaterialSelector from "./components/Comparison/Comparison";
 import SubmissionReview from "./components/Submissions/Submission";
 import EditData from "./components/EditData/EditData";
+import DashboardLandingPage from "./components/DashboardLandingPage/DashboardLandingPage";
+import FilterPage from "./components/FilterPage/FilterPage";
+import PeriodicTableSelection from "./components/PeriodicTableSelection/PeriodicTableSelection";
 import "./App.css";
 
 function App() {
@@ -63,15 +66,47 @@ function App() {
       <Routes>
         <Route
           path="/"
+          element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+        />
+        <Route
+          path="/dashboard"
           element={
             user ? (
-              <LandingPage
+              <DashboardLandingPage
                 setUser={setUser}
                 isAuthorized={isAuthorized}
                 user={user}
               />
             ) : (
-              <LoginPage />
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/select/:type"
+          element={
+            user ? (
+              <PeriodicTableSelection
+                setUser={setUser}
+                isAuthorized={isAuthorized}
+                user={user}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/filter"
+          element={
+            user ? (
+              <FilterPage
+                setUser={setUser}
+                isAuthorized={isAuthorized}
+                user={user}
+              />
+            ) : (
+              <Navigate to="/" replace />
             )
           }
         />
