@@ -32,10 +32,11 @@
   border-collapse: collapse;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
-.filter-table th, .filter-table td {
+.filter-table th,
+.filter-table td {
   padding: 10px 14px;
   border: 1px solid #e5e7eb;
   text-align: left;
@@ -82,7 +83,7 @@
   transition: border 0.2s;
   width: 100%;
   min-width: 140px;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.04);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.04);
 }
 
 .filter-group select:focus {
@@ -101,10 +102,32 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
 }
 
 .filter-submit-btn:disabled {
   background: #a5b4fc;
+  cursor: not-allowed;
+}
+
+.filter-clear-btn {
+  padding: 12px 28px;
+  background: #f3f4f6;
+  color: #2563eb;
+  border: 1.5px solid #2563eb;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+
+.filter-clear-btn:hover:not(:disabled) {
+  background: #2563eb;
+  color: #fff;
+}
+
+.filter-clear-btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }

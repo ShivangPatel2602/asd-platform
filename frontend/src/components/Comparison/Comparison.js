@@ -40,10 +40,35 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const params = new URLSearchParams(location.search);
   const elementParam = params.get("element");
   const surfaceParam = params.get("surface");
+  const materialParam = params.get("material");
+  const techniqueParam = params.get("technique");
   const isSurfaceMode = !!surfaceParam;
 
   useEffect(() => {
-    if (elementParam) {
+    setIsLoading(true);
+    setError("");
+    if (materialParam || surfaceParam || techniqueParam) {
+      const query = [];
+      if (materialParam)
+        query.push(`material=${encodeURIComponent(materialParam)}`);
+      if (surfaceParam)
+        query.push(`surface=${encodeURIComponent(surfaceParam)}`);
+      if (techniqueParam)
+        query.push(`technique=${encodeURIComponent(techniqueParam)}`);
+      fetch(`${API_BASE_URL}/filter-data?${query.join("&")}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.length === 0) {
+            setError("no-data");
+          } else {
+            setElementData(data);
+          }
+        })
+        .catch((err) => {
+          setError("Failed to fetch filtered data");
+        })
+        .finally(() => setIsLoading(false));
+    } else if (elementParam) {
       setElement(elementParam);
       setIsLoading(true);
       fetch(`${API_BASE_URL}/element-data?element=${elementParam}`)
@@ -193,7 +218,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           parts.push(word.slice(lastIndex, match.index));
         }
         parts.push(match[1]);
-        parts.push(<sub key={i + '-' + match.index}>{match[2]}</sub>);
+        parts.push(<sub key={i + "-" + match.index}>{match[2]}</sub>);
         lastIndex = regex.lastIndex;
       }
       if (lastIndex < word.length) {
@@ -804,7 +829,9 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
               </div>
 
               {showPlots && (
-                <div className={`plots-section${showPlots ? " with-plots" : ""}`}>
+                <div
+                  className={`plots-section${showPlots ? " with-plots" : ""}`}
+                >
                   <div className="plots-header">
                     <button
                       className="collapse-plots-btn"

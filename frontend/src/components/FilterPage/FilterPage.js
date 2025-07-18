@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
 import "./FilterPage.css";
 import config from "../../config";
@@ -8,11 +9,20 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
   const [surfaces, setSurfaces] = useState([]);
   const [techniques, setTechniques] = useState([]);
 
-  const [selectedMaterial, setSelectedMaterial] = useState("");
-  const [selectedSurface, setSelectedSurface] = useState("");
-  const [selectedTechnique, setSelectedTechnique] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [tableData, setTableData] = useState([]);
+  // Read initial filter values from URL
+  const params = new URLSearchParams(location.search);
+  const [selectedMaterial, setSelectedMaterial] = useState(
+    params.get("material") || ""
+  );
+  const [selectedSurface, setSelectedSurface] = useState(
+    params.get("surface") || ""
+  );
+  const [selectedTechnique, setSelectedTechnique] = useState(
+    params.get("technique") || ""
+  );
   const [loading, setLoading] = useState(false);
 
   // Fetch all options on mount
@@ -39,16 +49,43 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
       });
   }, [selectedMaterial, selectedSurface, selectedTechnique]);
 
-  // Handle submit to fetch filtered data
+  // Update URL when filters change
+  useEffect(() => {
+    const params = [];
+    if (selectedMaterial)
+      params.push(`material=${encodeURIComponent(selectedMaterial)}`);
+    if (selectedSurface)
+      params.push(`surface=${encodeURIComponent(selectedSurface)}`);
+    if (selectedTechnique)
+      params.push(`technique=${encodeURIComponent(selectedTechnique)}`);
+    const queryString = params.length ? `?${params.join("&")}` : "";
+    // Only update if different to avoid infinite loop
+    if (location.search !== queryString) {
+      navigate(`/filter${queryString}`, { replace: true });
+    }
+    // eslint-disable-next-line
+  }, [selectedMaterial, selectedSurface, selectedTechnique]);
+
+  // On submit, navigate to /comparison with query params
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    fetch(
-      `${config.BACKEND_API_URL}/api/filter-data?material=${selectedMaterial}&surface=${selectedSurface}&technique=${selectedTechnique}`
-    )
-      .then((res) => res.json())
-      .then((data) => setTableData(data))
-      .finally(() => setLoading(false));
+    const params = [];
+    if (selectedMaterial)
+      params.push(`material=${encodeURIComponent(selectedMaterial)}`);
+    if (selectedSurface)
+      params.push(`surface=${encodeURIComponent(selectedSurface)}`);
+    if (selectedTechnique)
+      params.push(`technique=${encodeURIComponent(selectedTechnique)}`);
+    const queryString = params.length ? `?${params.join("&")}` : "";
+    setLoading(false);
+    navigate(`/comparison${queryString}`);
+  };
+
+  const handleClear = () => {
+    setSelectedMaterial("");
+    setSelectedSurface("");
+    setSelectedTechnique("");
   };
 
   return (
@@ -106,47 +143,16 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
           >
             {loading ? "Loading..." : "Submit"}
           </button>
+          <button
+            type="button"
+            className="filter-clear-btn"
+            onClick={handleClear}
+            disabled={loading}
+            style={{ marginLeft: "16px" }}
+          >
+            Clear Filters
+          </button>
         </form>
-
-        {tableData.length > 0 && (
-          <div className="filter-table-wrapper">
-            <table className="filter-table">
-              <thead>
-                <tr>
-                  <th>Material</th>
-                  <th>Surface</th>
-                  <th>Technique</th>
-                  <th>Precursor</th>
-                  <th>Co-reactant</th>
-                  <th>Pretreatment</th>
-                  <th>Temperature</th>
-                  <th>Publications</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableData.map((row, idx) => (
-                  <tr key={idx}>
-                    <td>{row.material}</td>
-                    <td>{row.surface}</td>
-                    <td>{row.technique}</td>
-                    <td>{row.precursor}</td>
-                    <td>{row.coreactant}</td>
-                    <td>{row.pretreatment}</td>
-                    <td>{row.temperature}</td>
-                    <td>
-                      {row.publications &&
-                        row.publications.map((pub, i) => (
-                          <div key={i}>
-                            {pub.author}, {pub.journal} {pub.year}
-                          </div>
-                        ))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </>
   );
