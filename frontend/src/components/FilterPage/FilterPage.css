@@ -1,11 +1,12 @@
 .filter-page-container {
-  max-width: 800px;
-  margin: 60px auto;
-  padding: 40px 20px;
+  width: 100vw;
+  min-height: 100vh;
+  padding: 40px 40px 60px 40px;
   background: #f8fafc;
-  border-radius: 12px;
-  text-align: center;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 0;
+  text-align: left;
+  box-shadow: none;
+  margin: 0;
 }
 
 .filter-page-container h1 {
@@ -17,4 +18,93 @@
 .filter-page-container p {
   color: #64748b;
   font-size: 1.1rem;
+}
+
+.filter-table-wrapper {
+  margin-top: 40px;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.filter-table {
+  min-width: 1100px;
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+.filter-table th, .filter-table td {
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 1rem;
+}
+
+.filter-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+
+.filter-dropdowns {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
+  gap: 32px;
+  margin: 32px 0 0 0;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 180px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+.filter-group select {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  font-size: 1rem;
+  background: #fff;
+  color: #1e293b;
+  transition: border 0.2s;
+  width: 100%;
+  min-width: 140px;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.04);
+}
+
+.filter-group select:focus {
+  border-color: #2563eb;
+  outline: none;
+}
+
+.filter-submit-btn {
+  margin-left: 32px;
+  padding: 12px 28px;
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+}
+
+.filter-submit-btn:disabled {
+  background: #a5b4fc;
+  cursor: not-allowed;
 }

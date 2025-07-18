@@ -673,4 +673,11 @@ td sub {
   transition: flex-basis 0.5s cubic-bezier(0.4,0,0.2,1), max-width 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.5s, transform 0.5s;
 }
 
+.plots-section,
+.plots-section.with-plots {
+  position: sticky;
+  top: 20px;
+  align-self: flex-start;
+  height: fit-content;
+}
 

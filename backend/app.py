@@ -908,6 +908,81 @@ def delete_data():
     except Exception as e:
         print(f"Error deleting data: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/all-filters")
+def all_filters():
+    materials = set()
+    surfaces = set()
+    techniques = set()
+    for doc in collection.find():
+        for m in doc.get("materials", []):
+            materials.add(m["material"])
+            techniques.add(m.get("technique", ""))
+            for pc in m.get("pre_cor", []):
+                for cond in pc.get("conditions", []):
+                    surfaces.add(cond["surface"])
+    return jsonify({
+        "materials": sorted(materials),
+        "surfaces": sorted(surfaces),
+        "techniques": sorted(techniques)
+    })
+
+@app.route("/api/filter-options")
+def filter_options():
+    material = request.args.get("material")
+    surface = request.args.get("surface")
+    technique = request.args.get("technique")
+
+    materials = set()
+    surfaces = set()
+    techniques = set()
+    for doc in collection.find():
+        for m in doc.get("materials", []):
+            if material and m["material"] != material:
+                continue
+            if technique and m.get("technique", "") != technique:
+                continue
+            for pc in m.get("pre_cor", []):
+                for cond in pc.get("conditions", []):
+                    if surface and cond["surface"] != surface:
+                        continue
+                    materials.add(m["material"])
+                    techniques.add(m.get("technique", ""))
+                    surfaces.add(cond["surface"])
+    return jsonify({
+        "materials": sorted(materials),
+        "surfaces": sorted(surfaces),
+        "techniques": sorted(techniques)
+    })
+
+@app.route("/api/filter-data")
+def filter_data():
+    material = request.args.get("material")
+    surface = request.args.get("surface")
+    technique = request.args.get("technique")
+
+    results = []
+    for doc in collection.find():
+        for m in doc.get("materials", []):
+            if material and m["material"] != material:
+                continue
+            if technique and m.get("technique", "") != technique:
+                continue
+            for pc in m.get("pre_cor", []):
+                for cond in pc.get("conditions", []):
+                    if surface and cond["surface"] != surface:
+                        continue
+                    results.append({
+                        "material": m["material"],
+                        "technique": m.get("technique", ""),
+                        "precursor": pc["precursor"],
+                        "coreactant": pc["coreactant"],
+                        "surface": cond["surface"],
+                        "pretreatment": cond["pretreatment"],
+                        "temperature": cond.get("temperature", ""),
+                        "publications": [p["publication"] for p in cond.get("publications", [])]
+                    })
+    return jsonify(results)
     
 if __name__ == "__main__":
     app.run(port=5001, debug=True)
