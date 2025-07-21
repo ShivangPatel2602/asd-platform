@@ -973,6 +973,7 @@ def filter_data():
                     if surface and cond["surface"] != surface:
                         continue
                     results.append({
+                        "element": doc["element"],
                         "material": m["material"],
                         "technique": m.get("technique", ""),
                         "precursor": pc["precursor"],

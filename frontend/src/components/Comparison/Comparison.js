@@ -47,7 +47,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   useEffect(() => {
     setIsLoading(true);
     setError("");
-    if (materialParam || surfaceParam || techniqueParam) {
+    if (materialParam || techniqueParam) {
       const query = [];
       if (materialParam)
         query.push(`material=${encodeURIComponent(materialParam)}`);
@@ -70,7 +70,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         .finally(() => setIsLoading(false));
     } else if (elementParam) {
       setElement(elementParam);
-      setIsLoading(true);
       fetch(`${API_BASE_URL}/element-data?element=${elementParam}`)
         .then((res) => res.json())
         .then((data) => {
@@ -89,7 +88,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         });
     } else if (surfaceParam) {
       setElement(surfaceParam);
-      setIsLoading(true);
       fetch(`${API_BASE_URL}/element-data-by-surface?surface=${surfaceParam}`)
         .then((res) => res.json())
         .then((data) => {

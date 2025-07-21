@@ -34,6 +34,13 @@ const cards = [
     button: "Go to Filter",
     route: "/filter",
   },
+  {
+    icon: "📈",
+    title: "Model Your Data",
+    description: "Visualize and compare your own growth and non-growth surface data.",
+    button: "Go to Data Modelling",
+    route: "/model-data",
+  }
 ];
 
 const DashboardLandingPage = ({ setUser, isAuthorized, user }) => {

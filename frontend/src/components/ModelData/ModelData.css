@@ -1,0 +1,81 @@
+.model-data-container {
+  display: flex;
+  gap: 32px;
+  padding: 40px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 500px;
+}
+
+.model-data-left {
+  flex: 0 0 40%;
+  max-width: 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 32px 24px;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.06);
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group label {
+  font-weight: 600;
+  color: #2563eb;
+  margin-bottom: 4px;
+}
+
+.input-group textarea {
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  padding: 10px 14px;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 80px;
+  background: #fff;
+  color: #1e293b;
+}
+
+.plot-btn {
+  margin-top: 12px;
+  padding: 12px 28px;
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.plot-btn:hover {
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+  transform: scale(1.04);
+}
+
+.model-data-right {
+  flex: 1 1 60%;
+  max-width: 60%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.06);
+  padding: 32px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.plot-placeholder {
+  color: #64748b;
+  font-size: 1.1rem;
+  text-align: center;
+}

@@ -15,6 +15,7 @@ import EditData from "./components/EditData/EditData";
 import DashboardLandingPage from "./components/DashboardLandingPage/DashboardLandingPage";
 import FilterPage from "./components/FilterPage/FilterPage";
 import PeriodicTableSelection from "./components/PeriodicTableSelection/PeriodicTableSelection";
+import ModelData from "./components/ModelData/ModelData";
 import "./App.css";
 
 function App() {
@@ -115,6 +116,20 @@ function App() {
           element={
             user ? (
               <MaterialSelector
+                setUser={setUser}
+                isAuthorized={isAuthorized}
+                user={user}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/model-data"
+          element={
+            user ? (
+              <ModelData
                 setUser={setUser}
                 isAuthorized={isAuthorized}
                 user={user}
