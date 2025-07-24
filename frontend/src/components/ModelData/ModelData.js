@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import config from "../../config";
 
 const parseInput = (input) => {
   // Expects lines of "x y" or "x,y" or "x\ty"
@@ -32,9 +33,17 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
   const [nonGrowthData, setNonGrowthData] = useState([]);
   const [showPlot, setShowPlot] = useState(false);
 
-  const handlePlot = () => {
-    setGrowthData(parseInput(growthInput));
-    setNonGrowthData(parseInput(nonGrowthInput));
+  const handlePlot = async () => {
+    const growthArr = parseInput(growthInput).map(({ x, y }) => [x, y]);
+    const nonGrowthArr = parseInput(nonGrowthInput).map(({ x, y }) => [x, y]);
+    const response = await fetch(`${config.BACKEND_API_URL}/api/an-model`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ growth: growthArr, nongrowth: nonGrowthArr }),
+    });
+    const result = await response.json();
+    setGrowthData(result.growth.map(([x, y]) => ({ x, y })));
+    setNonGrowthData(result.nongrowth.map(([x, y]) => ({ x, y })));
     setShowPlot(true);
   };
 
@@ -100,25 +109,34 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
                   }}
                 />
                 <Tooltip />
-                <Legend />
+                <Legend
+                  verticalAlign="bottom"
+                  align="center"
+                  wrapperStyle={{
+                    marginTop: 32,
+                    position: "relative",
+                  }}
+                />
                 {growthData.length > 0 && (
                   <Line
-                    type="monotone"
+                    type="none"
                     dataKey="growth"
                     name="Growth Surface"
                     stroke="#2563eb"
-                    strokeWidth={3}
-                    dot
+                    strokeWidth={0}
+                    dot={{ r: 6, fill: "#2563eb" }}
+                    connectNulls={false}
                   />
                 )}
                 {nonGrowthData.length > 0 && (
                   <Line
-                    type="monotone"
+                    type="none"
                     dataKey="nonGrowth"
                     name="Non-Growth Surface"
                     stroke="#f59e42"
-                    strokeWidth={3}
-                    dot
+                    strokeWidth={0}
+                    dot={{ r: 6, fill: "#f59e42" }}
+                    connectNulls={false}
                   />
                 )}
               </LineChart>

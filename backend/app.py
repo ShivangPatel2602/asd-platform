@@ -7,6 +7,8 @@ from flask_mail import Mail, Message
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import json
+import numpy as np
+from AN_Model_py import run_an_model
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
@@ -984,6 +986,14 @@ def filter_data():
                         "publications": [p["publication"] for p in cond.get("publications", [])]
                     })
     return jsonify(results)
+    
+@app.route("/api/an-model", methods=["POST"])
+def an_model():
+    data = request.get_json()
+    growth = np.array(data.get("growth", []))
+    nongrowth = np.array(data.get("nongrowth", []))
+    result = run_an_model(growth, nongrowth)
+    return jsonify(result)
     
 if __name__ == "__main__":
     app.run(port=5001, debug=True)
