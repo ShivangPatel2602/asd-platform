@@ -32,6 +32,7 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
   const [growthData, setGrowthData] = useState([]);
   const [nonGrowthData, setNonGrowthData] = useState([]);
   const [showPlot, setShowPlot] = useState(false);
+  const [modelFitData, setModelFitData] = useState([]);
 
   const handlePlot = async () => {
     const growthArr = parseInput(growthInput).map(({ x, y }) => [x, y]);
@@ -45,18 +46,60 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
     setGrowthData(result.growth.map(([x, y]) => ({ x, y })));
     setNonGrowthData(result.nongrowth.map(([x, y]) => ({ x, y })));
     setShowPlot(true);
+
+    // Build combined data for chart
+    const allX = Array.from(
+      new Set([
+        ...result.growth.map(([x]) => x),
+        ...result.nongrowth.map(([x]) => x),
+        ...(result.model_x || []),
+      ])
+    ).sort((a, b) => a - b);
+
+    const growthMap = Object.fromEntries(result.growth.map(([x, y]) => [x, y]));
+    const nonGrowthMap = Object.fromEntries(
+      result.nongrowth.map(([x, y]) => [x, y])
+    );
+    const modelGrowthMap = Object.fromEntries(
+      (result.model_x || []).map((x, i) => [
+        x,
+        result.model_growth_y?.[i] ?? null,
+      ])
+    );
+    const modelNonGrowthMap = Object.fromEntries(
+      (result.model_x || []).map((x, i) => [
+        x,
+        result.model_nongrowth_y?.[i] ?? null,
+      ])
+    );
+
+    const modelFitData = allX.map((x) => ({
+      x,
+      growth: growthMap[x] ?? null,
+      nonGrowth: nonGrowthMap[x] ?? null,
+      modelGrowth: modelGrowthMap[x] ?? null,
+      modelNonGrowth: modelNonGrowthMap[x] ?? null,
+    }));
+
+    // --- New: Trim model fit to just beyond last user x ---
+    const maxUserX = Math.max(
+      ...result.growth.map(([x]) => x),
+      ...result.nongrowth.map(([x]) => x)
+    );
+    const model_x = result.model_x || [];
+    let cutoffIndex = model_x.findIndex((x) => x > maxUserX);
+    if (cutoffIndex === -1) cutoffIndex = model_x.length;
+    const trimmedModelFitData = modelFitData.slice(0, cutoffIndex + 1);
+
+    // --- New: Use index for equal spacing ---
+    const indexedData = trimmedModelFitData.map((d, i) => ({
+      ...d,
+      xIndex: i,
+      xLabel: d.x,
+    }));
+
+    setModelFitData(indexedData);
   };
-
-  // Combine x values for chart
-  const allX = Array.from(
-    new Set([...growthData.map((d) => d.x), ...nonGrowthData.map((d) => d.x)])
-  ).sort((a, b) => a - b);
-
-  const chartData = allX.map((x) => ({
-    x,
-    growth: growthData.find((d) => d.x === x)?.y ?? null,
-    nonGrowth: nonGrowthData.find((d) => d.x === x)?.y ?? null,
-  }));
 
   return (
     <>
@@ -94,10 +137,11 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
         <div className="model-data-right">
           {showPlot && (growthData.length > 0 || nonGrowthData.length > 0) ? (
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData}>
+              <LineChart data={modelFitData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="x"
+                  dataKey="xIndex"
+                  tickFormatter={(i) => modelFitData[i]?.xLabel ?? ""}
                   label={{ value: "X", position: "bottom", fontSize: 16 }}
                 />
                 <YAxis
@@ -117,28 +161,42 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
                     position: "relative",
                   }}
                 />
-                {growthData.length > 0 && (
-                  <Line
-                    type="none"
-                    dataKey="growth"
-                    name="Growth Surface"
-                    stroke="#2563eb"
-                    strokeWidth={0}
-                    dot={{ r: 6, fill: "#2563eb" }}
-                    connectNulls={false}
-                  />
-                )}
-                {nonGrowthData.length > 0 && (
-                  <Line
-                    type="none"
-                    dataKey="nonGrowth"
-                    name="Non-Growth Surface"
-                    stroke="#f59e42"
-                    strokeWidth={0}
-                    dot={{ r: 6, fill: "#f59e42" }}
-                    connectNulls={false}
-                  />
-                )}
+                {/* User data as dots */}
+                <Line
+                  type="none"
+                  dataKey="growth"
+                  name="Growth Surface Data"
+                  stroke="#2563eb"
+                  strokeWidth={0}
+                  dot={{ r: 6, fill: "#2563eb" }}
+                  connectNulls={false}
+                />
+                <Line
+                  type="none"
+                  dataKey="nonGrowth"
+                  name="Non-Growth Surface Data"
+                  stroke="#f59e42"
+                  strokeWidth={0}
+                  dot={{ r: 6, fill: "#f59e42" }}
+                  connectNulls={false}
+                />
+                {/* Model fit curves */}
+                <Line
+                  type="monotone"
+                  dataKey="modelNonGrowth"
+                  name="Non-Growth Surface Fit"
+                  stroke="#f59e42"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="modelGrowth"
+                  name="Growth Surface Fit"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dot={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           ) : (

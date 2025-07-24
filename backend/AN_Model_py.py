@@ -16,6 +16,8 @@ def run_an_model(growth, nongrowth):
     gdot = growth / (len(data1) - 1)
     ncycles = int(data2[-1,0] * 1.5)
 
+    best_V = {"V": None}
+
     # Vectorized AN_Model_py
     def AN_Model_py(gdot, nhat, ndot0, td, ncycles, Data2):
         rmax = ncycles + 1
@@ -103,11 +105,15 @@ def run_an_model(growth, nongrowth):
             rmse_sum += (thickness - model_val)**2
             count += 1
         rmse = np.sqrt(rmse_sum / count) if count > 0 else 1e6
-        return rmse
+        return rmse, V
 
     # 4. Define the objective function for optimization
     def objective(nhat):
-        return AN_Model_py(gdot, nhat[0], ndot0=0, td=0, ncycles=ncycles, Data2=data2)
+        rmse, V = AN_Model_py(gdot, nhat[0], ndot0=0, td=0, ncycles=ncycles, Data2=data2)
+        if best_V["V"] is None or rmse < best_V.get("best_rmse", float("inf")):
+            best_V["V"] = V.copy()
+            best_V["best_rmse"] = rmse
+        return rmse
 
     # 5. Optimize nhat to minimize RMSE
     start_time = time.perf_counter()
@@ -115,10 +121,20 @@ def run_an_model(growth, nongrowth):
     end_time = time.perf_counter()
 
     final_nhat = res.x[0]
+    V = best_V["V"]
+
+    model_x = V[:, 1].tolist()
+    model_nongrowth_y = V[:, 3].tolist()
+    model_growth_y = V[:, 2].tolist()
+
     print(f'Fitting completed in {end_time - start_time:.1f} seconds.')
     print(f'Final nhat value = {final_nhat:.3e}.') 
+    
     return {
         "final_nhat": float(final_nhat),
         "growth": data1.tolist(),
-        "nongrowth": data2.tolist()
+        "nongrowth": data2.tolist(),
+        "model_x": model_x,
+        "model_nongrowth_y": model_nongrowth_y,
+        "model_growth_y": model_growth_y
     }
