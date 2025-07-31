@@ -3,12 +3,13 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 import time
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 from numba import njit, prange
 import plotly.graph_objects as go
 import plotly.express as px
 import webbrowser
 import tempfile
+import gc
 
 # Load experimental thickness data from Excel files
 # Assumes data1.xlsx and data2.xlsx are in the same directory
@@ -61,9 +62,21 @@ class FitScenario:
         return rmse
 
     def fit(self):
-        x0 = [(low + high) // 2 for (low, high) in self.param_bounds]
-        self.result = minimize(self.objective, x0, bounds=self.param_bounds, method='TNC')
-        return self.result.fun  # RMSE
+        x0 = []
+        for (low, high) in self.param_bounds:
+            if low == 0:
+                x0.append(1e-6)  # Small positive value
+            else:
+                x0.append((low + high) / 2)  # Use float division
+        
+        self.result = minimize(
+            self.objective, 
+            x0, 
+            bounds=self.param_bounds, 
+            method='TNC',
+            options={'maxfun': 100}
+        )
+        return self.result.fun
 
 # Class wrapper to select scenarios and run fitting process
 class ScenarioSelector:
@@ -72,9 +85,9 @@ class ScenarioSelector:
         self.results = {}
 
     def run_all(self):
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = executor.map(run_fit, self.scenarios)
-            self.results = dict(futures)
+        for scenario in self.scenarios:
+            name, result = run_fit(scenario)
+            self.results[name] = result
 
     def get_best(self, zero_tol=1e-8):
         nonzero_results = {
@@ -91,7 +104,7 @@ class ScenarioSelector:
 
 #%% Section 3: Computation functions
 # Parallelized, JIT-compiled kernel function using Numba
-@njit(parallel=True, fastmath=True)
+@njit(parallel=True, fastmath=True, cache=True)
 def _compute_dV_kernel(nhat, ndot0, td, gdot, rmax, A0, exp_decay_lookup):
     r = np.arange(1, rmax)
     dV_accum = np.zeros((rmax - 1, rmax))
@@ -220,81 +233,85 @@ def run_an_model(growth, nongrowth):
     """
     Run the vectorized model with multiple scenarios and return the best fit results
     """
-    # Calculate growth rate and cycles from the input data
-    data1 = np.array(growth)  # growth surface data
-    data2 = np.array(nongrowth)  # non-growth surface data
-    
-    growth_rate = np.sum((data1[1:,1] - data1[:-1,1]) / (data1[1:,0] - data1[:-1,0]))
-    gdot = growth_rate / (len(data1) - 1)
-    ncycles = int(data2[-1,0] * 1.5)
-    
-    # Construct scenarios with different combinations of independent variables
-    scenarios = [
-        FitScenario(
-            "nhat only",
-            param_bounds=[(0, 1e-1)],
-            param_flags={'nhat': True, 'ndot0': False, 'td': False},
-            gdot=gdot, ncycles=ncycles, data2=data2
-        ),
-        FitScenario(
-            "ndot0 only",
-            param_bounds=[(0, 1e-1)],
-            param_flags={'nhat': False, 'ndot0': True, 'td': False},
-            gdot=gdot, ncycles=ncycles, data2=data2
-        ),
-        FitScenario(
-            "ndot0 and td",
-            param_bounds=[(0, 1e-1), (0, int(ncycles/2))],
-            param_flags={'nhat': False, 'ndot0': True, 'td': True},
-            gdot=gdot, ncycles=ncycles, data2=data2
-        ),
-        FitScenario(
-            "nhat and ndot0",
-            param_bounds=[(0, 1e-1), (0, 1e-1)],
-            param_flags={'nhat': True, 'ndot0': True, 'td': False},
-            gdot=gdot, ncycles=ncycles, data2=data2
-        ),
-        FitScenario(
-            "nhat + ndot0 + td",
-            param_bounds=[(0, 1e-1), (0, 1e-1), (0, int(ncycles/2))],
-            param_flags={'nhat': True, 'ndot0': True, 'td': True},
-            gdot=gdot, ncycles=ncycles, data2=data2
-        )
-    ]
-    
-    # Run all scenarios
-    selector = ScenarioSelector(scenarios)
-    selector.run_all()
-    
-    # Get the best scenario
-    best_name, best_result = selector.get_best()
-    best_V = best_result['V']
-    
-    # Prepare data for frontend
-    model_x = best_V[:, 1].tolist()  # cycles
-    model_growth_y = best_V[:, 2].tolist()  # growth surface thickness
-    model_nongrowth_y = best_V[:, 3].tolist()  # non-growth surface thickness
-    
-    # Get all scenario results for comparison
-    scenario_results = {}
-    for name, result in selector.results.items():
-        V = result['V']
-        scenario_results[name] = {
-            'rmse': float(result['rmse']),
-            'params': result['params'].tolist(),
-            'model_x': V[:, 1].tolist(),
-            'model_growth_y': V[:, 2].tolist(),
-            'model_nongrowth_y': V[:, 3].tolist()
+    try:
+        # Calculate growth rate and cycles from the input data
+        data1 = np.array(growth)  # growth surface data
+        data2 = np.array(nongrowth)  # non-growth surface data
+        
+        growth_rate = np.sum((data1[1:,1] - data1[:-1,1]) / (data1[1:,0] - data1[:-1,0]))
+        gdot = growth_rate / (len(data1) - 1)
+        ncycles = int(data2[-1,0] * 1.5)
+        
+        # Construct scenarios with different combinations of independent variables
+        scenarios = [
+            FitScenario(
+                "nhat only",
+                param_bounds=[(1e-8, 1e-2)],
+                param_flags={'nhat': True, 'ndot0': False, 'td': False},
+                gdot=gdot, ncycles=ncycles, data2=data2
+            ),
+            FitScenario(
+                "ndot0 only",
+                param_bounds=[(1e-8, 1e-2)],
+                param_flags={'nhat': False, 'ndot0': True, 'td': False},
+                gdot=gdot, ncycles=ncycles, data2=data2
+            ),
+            FitScenario(
+                "ndot0 and td",
+                param_bounds=[(1e-8, 1e-2), (0, int(ncycles/2))],
+                param_flags={'nhat': False, 'ndot0': True, 'td': True},
+                gdot=gdot, ncycles=ncycles, data2=data2
+            ),
+            FitScenario(
+                "nhat and ndot0",
+                param_bounds=[(1e-8, 1e-2), (1e-8, 1e-2)],
+                param_flags={'nhat': True, 'ndot0': True, 'td': False},
+                gdot=gdot, ncycles=ncycles, data2=data2
+            ),
+            FitScenario(
+                "nhat + ndot0 + td",
+                param_bounds=[(1e-8, 1e-2), (1e-8, 1e-2), (0, int(ncycles/2))],
+                param_flags={'nhat': True, 'ndot0': True, 'td': True},
+                gdot=gdot, ncycles=ncycles, data2=data2
+            )
+        ]
+        
+        # Run all scenarios
+        selector = ScenarioSelector(scenarios)
+        selector.run_all()
+        
+        # Get the best scenario
+        best_name, best_result = selector.get_best()
+        best_V = best_result['V']
+        
+        # Prepare data for frontend
+        model_x = best_V[:, 1].tolist()  # cycles
+        model_growth_y = best_V[:, 2].tolist()  # growth surface thickness
+        model_nongrowth_y = best_V[:, 3].tolist()  # non-growth surface thickness
+        
+        # Get all scenario results for comparison
+        scenario_results = {}
+        for name, result in selector.results.items():
+            V = result['V']
+            scenario_results[name] = {
+                'rmse': float(result['rmse']),
+                'params': result['params'].tolist(),
+                'model_x': V[:, 1].tolist(),
+                'model_growth_y': V[:, 2].tolist(),
+                'model_nongrowth_y': V[:, 3].tolist()
+            }
+        
+        return {
+            "best_scenario": best_name,
+            "best_rmse": float(best_result['rmse']),
+            "best_params": best_result['params'].tolist(),
+            "growth": data1.tolist(),  # Original growth data
+            "nongrowth": data2.tolist(),  # Original nongrowth data
+            "model_x": model_x,
+            "model_growth_y": model_growth_y,
+            "model_nongrowth_y": model_nongrowth_y,
+            "all_scenarios": scenario_results
         }
-    
-    return {
-        "best_scenario": best_name,
-        "best_rmse": float(best_result['rmse']),
-        "best_params": best_result['params'].tolist(),
-        "growth": data1.tolist(),  # Original growth data
-        "nongrowth": data2.tolist(),  # Original nongrowth data
-        "model_x": model_x,
-        "model_growth_y": model_growth_y,
-        "model_nongrowth_y": model_nongrowth_y,
-        "all_scenarios": scenario_results
-    }
+    finally:
+        if (len(gc.get_objects()) > 10000):
+            gc.collect()
