@@ -16,8 +16,8 @@
   background: #f8fafc;
   border-radius: 12px;
   padding: 32px 24px;
-  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.10);
-  border: 1.5px solid #e0e7ef
+  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.1);
+  border: 1.5px solid #e0e7ef;
 }
 
 .input-group {
@@ -67,7 +67,7 @@
   max-width: 60%;
   background: #f8fafc;
   border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.10);
+  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.1);
   padding: 32px 24px;
   display: flex;
   align-items: center;
@@ -80,4 +80,81 @@
   color: #64748b;
   font-size: 1.1rem;
   text-align: center;
+}
+
+.scenario-results {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.scenario-results h3 {
+  margin: 0 0 12px 0;
+  color: #2563eb;
+  font-size: 1.1rem;
+}
+
+.best-scenario {
+  background: #dbeafe;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  border-left: 4px solid #2563eb;
+}
+
+.all-scenarios h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.scenario-item {
+  padding: 4px 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.scenario-item.best {
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-message {
+  color: #64748b;
+  font-size: 1rem;
+  text-align: center;
+  max-width: 200px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.plot-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }

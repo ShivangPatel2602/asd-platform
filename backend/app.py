@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import json
 import numpy as np
-from AN_Model_py import run_an_model
+from vectorized_combination import run_an_model
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'

@@ -14,7 +14,6 @@ import {
 import config from "../../config";
 
 const parseInput = (input) => {
-  // Expects lines of "x y" or "x,y" or "x\ty"
   return input
     .split("\n")
     .map((line) => line.trim())
@@ -29,76 +28,92 @@ const parseInput = (input) => {
 const ModelData = ({ setUser, isAuthorized, user }) => {
   const [growthInput, setGrowthInput] = useState("");
   const [nonGrowthInput, setNonGrowthInput] = useState("");
-  const [growthData, setGrowthData] = useState([]);
-  const [nonGrowthData, setNonGrowthData] = useState([]);
   const [showPlot, setShowPlot] = useState(false);
   const [modelFitData, setModelFitData] = useState([]);
+  const [scenarioResults, setScenarioResults] = useState({});
+  const [bestScenario, setBestScenario] = useState("");
+  const [bestRmse, setBestRmse] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handlePlot = async () => {
-    const growthArr = parseInput(growthInput).map(({ x, y }) => [x, y]);
-    const nonGrowthArr = parseInput(nonGrowthInput).map(({ x, y }) => [x, y]);
-    const response = await fetch(`${config.BACKEND_API_URL}/api/an-model`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ growth: growthArr, nongrowth: nonGrowthArr }),
-    });
-    const result = await response.json();
-    setGrowthData(result.growth.map(([x, y]) => ({ x, y })));
-    setNonGrowthData(result.nongrowth.map(([x, y]) => ({ x, y })));
-    setShowPlot(true);
+    setIsLoading(true);
+    setShowPlot(false);
 
-    // Build combined data for chart
-    const allX = Array.from(
-      new Set([
+    try {
+      const growthArr = parseInput(growthInput).map(({ x, y }) => [x, y]);
+      const nonGrowthArr = parseInput(nonGrowthInput).map(({ x, y }) => [x, y]);
+
+      const response = await fetch(`${config.BACKEND_API_URL}/api/an-model`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ growth: growthArr, nongrowth: nonGrowthArr }),
+      });
+      const result = await response.json();
+
+      setScenarioResults(result.all_scenarios);
+      setBestScenario(result.best_scenario);
+      setBestRmse(result.best_rmse);
+
+      // Build combined data for chart using best scenario
+      const allX = Array.from(
+        new Set([
+          ...result.growth.map(([x]) => x),
+          ...result.nongrowth.map(([x]) => x),
+          ...(result.model_x || []),
+        ])
+      ).sort((a, b) => a - b);
+
+      const growthMap = Object.fromEntries(
+        result.growth.map(([x, y]) => [x, y])
+      );
+      const nonGrowthMap = Object.fromEntries(
+        result.nongrowth.map(([x, y]) => [x, y])
+      );
+      const modelGrowthMap = Object.fromEntries(
+        (result.model_x || []).map((x, i) => [
+          x,
+          result.model_growth_y?.[i] ?? null,
+        ])
+      );
+      const modelNonGrowthMap = Object.fromEntries(
+        (result.model_x || []).map((x, i) => [
+          x,
+          result.model_nongrowth_y?.[i] ?? null,
+        ])
+      );
+
+      const modelFitData = allX.map((x) => ({
+        x,
+        growth: growthMap[x] ?? null,
+        nonGrowth: nonGrowthMap[x] ?? null,
+        modelGrowth: modelGrowthMap[x] ?? null,
+        modelNonGrowth: modelNonGrowthMap[x] ?? null,
+      }));
+
+      // Trim model fit to just beyond last user x
+      const maxUserX = Math.max(
         ...result.growth.map(([x]) => x),
-        ...result.nongrowth.map(([x]) => x),
-        ...(result.model_x || []),
-      ])
-    ).sort((a, b) => a - b);
+        ...result.nongrowth.map(([x]) => x)
+      );
+      const model_x = result.model_x || [];
+      let cutoffIndex = model_x.findIndex((x) => x > maxUserX);
+      if (cutoffIndex === -1) cutoffIndex = model_x.length;
+      const trimmedModelFitData = modelFitData.slice(0, cutoffIndex + 1);
 
-    const growthMap = Object.fromEntries(result.growth.map(([x, y]) => [x, y]));
-    const nonGrowthMap = Object.fromEntries(
-      result.nongrowth.map(([x, y]) => [x, y])
-    );
-    const modelGrowthMap = Object.fromEntries(
-      (result.model_x || []).map((x, i) => [
-        x,
-        result.model_growth_y?.[i] ?? null,
-      ])
-    );
-    const modelNonGrowthMap = Object.fromEntries(
-      (result.model_x || []).map((x, i) => [
-        x,
-        result.model_nongrowth_y?.[i] ?? null,
-      ])
-    );
+      // Use index for equal spacing
+      const indexedData = trimmedModelFitData.map((d, i) => ({
+        ...d,
+        xIndex: i,
+        xLabel: d.x,
+      }));
 
-    const modelFitData = allX.map((x) => ({
-      x,
-      growth: growthMap[x] ?? null,
-      nonGrowth: nonGrowthMap[x] ?? null,
-      modelGrowth: modelGrowthMap[x] ?? null,
-      modelNonGrowth: modelNonGrowthMap[x] ?? null,
-    }));
-
-    // --- New: Trim model fit to just beyond last user x ---
-    const maxUserX = Math.max(
-      ...result.growth.map(([x]) => x),
-      ...result.nongrowth.map(([x]) => x)
-    );
-    const model_x = result.model_x || [];
-    let cutoffIndex = model_x.findIndex((x) => x > maxUserX);
-    if (cutoffIndex === -1) cutoffIndex = model_x.length;
-    const trimmedModelFitData = modelFitData.slice(0, cutoffIndex + 1);
-
-    // --- New: Use index for equal spacing ---
-    const indexedData = trimmedModelFitData.map((d, i) => ({
-      ...d,
-      xIndex: i,
-      xLabel: d.x,
-    }));
-
-    setModelFitData(indexedData);
+      setModelFitData(indexedData);
+      setShowPlot(true);
+    } catch (error) {
+      console.error("Error processing data:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -114,7 +129,7 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
               id="growth-input"
               value={growthInput}
               onChange={(e) => setGrowthInput(e.target.value)}
-              placeholder="e.g.\n1 2\n2 3\n3 4"
+              placeholder="e.g.\n0 0\n25 1.5\n96 6\n144 9.1\n240 15.2\n336 21.5"
               rows={8}
             />
           </div>
@@ -126,27 +141,68 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
               id="non-growth-input"
               value={nonGrowthInput}
               onChange={(e) => setNonGrowthInput(e.target.value)}
-              placeholder="e.g.\n1 1\n2 1.5\n3 2"
+              placeholder="e.g.\n0 0\n25 0.5\n96 2\n144 3.1\n240 5.2\n336 7.5"
               rows={8}
             />
           </div>
-          <button className="plot-btn" onClick={handlePlot}>
-            Plot Data
+          <button
+            className="plot-btn"
+            onClick={handlePlot}
+            disabled={isLoading}
+          >
+            {isLoading ? "Processing..." : "Plot Data"}
           </button>
+
+          {/* Display scenario results */}
+          {showPlot && Object.keys(scenarioResults).length > 0 && (
+            <div className="scenario-results">
+              <h3>Model Results</h3>
+              <div className="best-scenario">
+                <strong>Best Scenario:</strong> {bestScenario}
+                <br />
+                <strong>RMSE:</strong> {bestRmse.toExponential(4)}
+              </div>
+              <div className="all-scenarios">
+                <h4>All Scenarios:</h4>
+                {Object.entries(scenarioResults).map(([name, result]) => (
+                  <div
+                    key={name}
+                    className={`scenario-item ${
+                      name === bestScenario ? "best" : ""
+                    }`}
+                  >
+                    <strong>{name}:</strong> RMSE ={" "}
+                    {result.rmse.toExponential(4)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="model-data-right">
-          {showPlot && (growthData.length > 0 || nonGrowthData.length > 0) ? (
+          {isLoading ? (
+            <div className="loading-container">
+              <div className="loading-spinner"></div>
+              <div className="loading-message">
+                Processing data and running model scenarios...
+              </div>
+            </div>
+          ) : showPlot && modelFitData.length > 0 ? (
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={modelFitData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="xIndex"
                   tickFormatter={(i) => modelFitData[i]?.xLabel ?? ""}
-                  label={{ value: "X", position: "bottom", fontSize: 16 }}
+                  label={{
+                    value: "Cycle Number",
+                    position: "bottom",
+                    fontSize: 16,
+                  }}
                 />
                 <YAxis
                   label={{
-                    value: "Y",
+                    value: "Thickness (nm)",
                     angle: -90,
                     position: "insideLeft",
                     fontSize: 16,
