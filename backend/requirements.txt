@@ -7,6 +7,7 @@ flask-cors
 gunicorn
 numba
 numpy
+openpyxl
 pandas
 plotly
 pymongo
