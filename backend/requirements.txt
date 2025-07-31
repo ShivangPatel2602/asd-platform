@@ -1,5 +1,4 @@
 authlib
-concurrent-futures
 dotenv
 dnspython
 Flask
