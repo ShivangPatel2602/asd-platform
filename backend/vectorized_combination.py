@@ -4,12 +4,14 @@ import pandas as pd
 from scipy.optimize import minimize
 import time
 from concurrent.futures import ProcessPoolExecutor
+import numba
 from numba import njit, prange
 import plotly.graph_objects as go
 import plotly.express as px
 import webbrowser
 import tempfile
 import gc
+
 
 #%% Section 2: Scenario fitting function and class construction
 # Top-level fitting function to be executed in parallel
@@ -75,9 +77,10 @@ class ScenarioSelector:
         self.results = {}
 
     def run_all(self):
-        for scenario in self.scenarios:
-            name, result = run_fit(scenario)
-            self.results[name] = result
+        # Use ThreadPoolExecutor with limited workers
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            futures = executor.map(run_fit, self.scenarios)
+            self.results = dict(futures)
 
     def get_best(self, zero_tol=1e-8):
         nonzero_results = {
@@ -290,7 +293,7 @@ def run_an_model(growth, nongrowth):
             }
         
         gc.collect()
-        
+
         return {
             "best_scenario": best_name,
             "best_rmse": float(best_result['rmse']),
