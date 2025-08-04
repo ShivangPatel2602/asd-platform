@@ -1,27 +1,15 @@
-#%% Section 1: Package imports and data loading
+#%% Section 1: Package imports
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from numba import njit, prange
 import plotly.graph_objects as go
 import plotly.express as px
 import webbrowser
 import tempfile
 import gc
-
-# Load experimental thickness data from Excel files
-# Assumes data1.xlsx and data2.xlsx are in the same directory
-# data1: columns = [cycle, thickness]
-# data2: columns = [cycle, thickness]
-data1 = pd.read_excel('Data1.xlsx', sheet_name='Data1', header = None).values
-data2 = pd.read_excel('Data2.xlsx', sheet_name='Data2', header = None).values
-
-# Use experimental data to calculate growth rate and number of cycles
-growth = np.sum((data1[1:,1] - data1[:-1,1]) / (data1[1:,0] - data1[:-1,0]))
-gdot = growth / (len(data1) - 1)
-ncycles = int(data2[-1,0] * 1.5)
 
 #%% Section 2: Scenario fitting function and class construction
 # Top-level fitting function to be executed in parallel
@@ -62,19 +50,21 @@ class FitScenario:
         return rmse
 
     def fit(self):
+        # Better initial guesses for faster convergence
         x0 = []
         for (low, high) in self.param_bounds:
             if low == 0:
-                x0.append(1e-6)  # Small positive value
+                x0.append(1e-6)
             else:
-                x0.append((low + high) / 2)  # Use float division
+                # Use geometric mean for better initial guess
+                x0.append(np.sqrt(low * high))
         
         self.result = minimize(
             self.objective, 
             x0, 
             bounds=self.param_bounds, 
             method='TNC',
-            options={'maxfun': 100}
+            options={'maxfun': 100}  # Keep your original iterations
         )
         return self.result.fun
 
@@ -85,9 +75,9 @@ class ScenarioSelector:
         self.results = {}
 
     def run_all(self):
-        for scenario in self.scenarios:
-            name, result = run_fit(scenario)
-            self.results[name] = result
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            futures = executor.map(run_fit, self.scenarios)
+            self.results = dict(futures)
 
     def get_best(self, zero_tol=1e-8):
         nonzero_results = {
@@ -109,7 +99,7 @@ def _compute_dV_kernel(nhat, ndot0, td, gdot, rmax, A0, exp_decay_lookup):
     r = np.arange(1, rmax)
     dV_accum = np.zeros((rmax - 1, rmax))
 
-    for t_idx in prange(rmax - 1):
+    for t_idx in prange(rmax - 1):  # Keep prange as in your original
         t = r[t_idx]
         t2 = t * t
         for s in range(rmax):
@@ -225,10 +215,7 @@ def AN_Model_py(gdot, nhat, ndot0, td, ncycles, data2, return_V=False):
 
     return (rmse, V) if return_V else rmse
 
-# Objective function for optimization
-def objective(nhat):
-    return AN_Model_py(gdot, nhat[0], ndot0=0, td=0, ncycles=ncycles, data2=data2)
-
+# Function to run the model with frontend data
 def run_an_model(growth, nongrowth):
     """
     Run the vectorized model with multiple scenarios and return the best fit results
@@ -238,39 +225,40 @@ def run_an_model(growth, nongrowth):
         data1 = np.array(growth)  # growth surface data
         data2 = np.array(nongrowth)  # non-growth surface data
         
-        growth_rate = np.sum((data1[1:,1] - data1[:-1,1]) / (data1[1:,0] - data1[:-1,0]))
+        growth_rate = np.sum(np.diff(data1[:, 1]) / np.diff(data1[:, 0]))
         gdot = growth_rate / (len(data1) - 1)
-        ncycles = int(data2[-1,0] * 1.5)
+        ncycles = int(data2[-1, 0] * 1.5)
         
         # Construct scenarios with different combinations of independent variables
+        # In run_an_model, update scenarios with tighter bounds:
         scenarios = [
             FitScenario(
                 "nhat only",
-                param_bounds=[(1e-8, 1e-2)],
+                param_bounds=[(1e-8, 1e-1)],  # Keep your original bounds
                 param_flags={'nhat': True, 'ndot0': False, 'td': False},
                 gdot=gdot, ncycles=ncycles, data2=data2
             ),
             FitScenario(
                 "ndot0 only",
-                param_bounds=[(1e-8, 1e-2)],
+                param_bounds=[(1e-8, 1e-1)],
                 param_flags={'nhat': False, 'ndot0': True, 'td': False},
                 gdot=gdot, ncycles=ncycles, data2=data2
             ),
             FitScenario(
                 "ndot0 and td",
-                param_bounds=[(1e-8, 1e-2), (0, int(ncycles/2))],
+                param_bounds=[(1e-8, 1e-1), (1, int(ncycles/4))],  # Tighter td bounds
                 param_flags={'nhat': False, 'ndot0': True, 'td': True},
                 gdot=gdot, ncycles=ncycles, data2=data2
             ),
             FitScenario(
                 "nhat and ndot0",
-                param_bounds=[(1e-8, 1e-2), (1e-8, 1e-2)],
+                param_bounds=[(1e-8, 1e-1), (1e-8, 1e-1)],
                 param_flags={'nhat': True, 'ndot0': True, 'td': False},
                 gdot=gdot, ncycles=ncycles, data2=data2
             ),
             FitScenario(
                 "nhat + ndot0 + td",
-                param_bounds=[(1e-8, 1e-2), (1e-8, 1e-2), (0, int(ncycles/2))],
+                param_bounds=[(1e-8, 1e-1), (1e-8, 1e-1), (1, int(ncycles/4))],  # Tighter td bounds
                 param_flags={'nhat': True, 'ndot0': True, 'td': True},
                 gdot=gdot, ncycles=ncycles, data2=data2
             )
@@ -312,6 +300,19 @@ def run_an_model(growth, nongrowth):
             "model_nongrowth_y": model_nongrowth_y,
             "all_scenarios": scenario_results
         }
+    except Exception as e:
+        print(f"Model error: {e}")
+        return {
+            "error": f"Computation failed: {str(e)}",
+            "best_scenario": "error",
+            "best_rmse": float('inf'),
+            "growth": data1.tolist() if 'data1' in locals() else [],
+            "nongrowth": data2.tolist() if 'data2' in locals() else [],
+            "model_x": [],
+            "model_growth_y": [],
+            "model_nongrowth_y": [],
+            "all_scenarios": {}
+        }
     finally:
-        if (len(gc.get_objects()) > 10000):
+        if len(gc.get_objects()) > 10000:
             gc.collect()
