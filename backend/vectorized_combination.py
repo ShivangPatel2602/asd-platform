@@ -75,9 +75,9 @@ class ScenarioSelector:
         self.results = {}
 
     def run_all(self):
-        with ProcessPoolExecutor(max_workers=4) as executor:
-            futures = executor.map(run_fit, self.scenarios)
-            self.results = dict(futures)
+        for scenario in self.scenarios:
+            name, result = run_fit(scenario)
+            self.results[name] = result
 
     def get_best(self, zero_tol=1e-8):
         nonzero_results = {
@@ -94,7 +94,7 @@ class ScenarioSelector:
 
 #%% Section 3: Computation functions
 # Parallelized, JIT-compiled kernel function using Numba
-@njit(parallel=True, fastmath=True, cache=True)
+@njit(parallel=True, fastmath=True, cache=True, boundscheck=False)
 def _compute_dV_kernel(nhat, ndot0, td, gdot, rmax, A0, exp_decay_lookup):
     r = np.arange(1, rmax)
     dV_accum = np.zeros((rmax - 1, rmax))
@@ -288,6 +288,8 @@ def run_an_model(growth, nongrowth):
                 'model_growth_y': V[:, 2].tolist(),
                 'model_nongrowth_y': V[:, 3].tolist()
             }
+        
+        gc.collect()
         
         return {
             "best_scenario": best_name,
