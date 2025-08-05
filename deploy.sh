@@ -1,48 +1,48 @@
 #!/bin/bash
 
-# Navigate to the app directory
-cd ~/app
+set -e  # Exit on error
 
-echo "Checking if git repository exists..."
+cd ~/app || exit 1
+
+# Pull latest code from GitHub
 if [ ! -d ".git" ]; then
-    echo "Initializing git repository..."
     git init
     git remote add origin https://github.com/ShivangPatel2602/asd-platform.git
 fi
 
-echo "Pulling latest code..."
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
-echo "Installing backend dependencies..."
+# Set up Python backend
+echo "Setting up backend..."
 cd backend
-# Check if virtual environment exists
-if [ -d "../venv" ]; then
-    source ../venv/bin/activate
+
+if [ ! -d "../venv" ]; then
+    python3 -m venv ../venv
 fi
+
+source ../venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 
-echo "Installing frontend dependencies..."
+# Set up frontend
 cd ../frontend
+echo "Installing frontend dependencies..."
 npm install
 
 echo "Building frontend..."
 npm run build
 
-echo "Restarting backend server..."
-# Try different restart methods
+# Start backend
+cd ../backend
+echo "Starting backend..."
+
 if command -v pm2 &> /dev/null; then
-    echo "Using PM2 to restart..."
     pm2 restart backend-app || pm2 start app.py --name backend-app
-elif command -v systemctl &> /dev/null; then
-    echo "Using systemctl to restart..."
-    sudo systemctl restart your-app || echo "Service not found, starting manually..."
-    cd ../backend
-    nohup python app.py > app.log 2>&1 &
 else
-    echo "No PM2 or systemctl found, starting manually..."
-    cd ../backend
+    echo "Restarting manually..."
     pkill -f "python app.py" || true
     nohup python app.py > app.log 2>&1 &
 fi
 
-echo "Deployment complete ✅"
+echo "✅ Deployment complete"
