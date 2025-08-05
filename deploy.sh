@@ -1,22 +1,24 @@
 #!/bin/bash
 
-set -e  # Exit on error
+set -e  # Stop on any error
 
-cd ~/app || exit 1
+cd ~/app
 
-# Pull latest code from GitHub
+# Check if .git exists
 if [ ! -d ".git" ]; then
-    git init
-    git remote add origin https://github.com/ShivangPatel2602/asd-platform.git
+    echo "Cloning fresh repo..."
+    rm -rf ~/app/*
+    git clone https://github.com/ShivangPatel2602/asd-platform.git .
+else
+    echo "Pulling latest code..."
+    git pull origin main
 fi
 
-git fetch origin
-git reset --hard origin/main
-
-# Set up Python backend
+# Backend setup
 echo "Setting up backend..."
 cd backend
 
+# Create venv if not present
 if [ ! -d "../venv" ]; then
     python3 -m venv ../venv
 fi
@@ -25,7 +27,7 @@ source ../venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Set up frontend
+# Frontend setup
 cd ../frontend
 echo "Installing frontend dependencies..."
 npm install
@@ -33,16 +35,13 @@ npm install
 echo "Building frontend..."
 npm run build
 
-# Start backend
+# Backend server
 cd ../backend
-echo "Starting backend..."
 
-if command -v pm2 &> /dev/null; then
-    pm2 restart backend-app || pm2 start app.py --name backend-app
-else
-    echo "Restarting manually..."
-    pkill -f "python app.py" || true
-    nohup python app.py > app.log 2>&1 &
-fi
+echo "Starting backend server..."
+# Kill existing backend server if any
+pkill -f "python app.py" || true
+
+nohup python app.py > app.log 2>&1 &
 
 echo "✅ Deployment complete"
