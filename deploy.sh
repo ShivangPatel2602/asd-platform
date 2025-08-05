@@ -7,7 +7,7 @@ echo "Checking if git repository exists..."
 if [ ! -d ".git" ]; then
     echo "Initializing git repository..."
     git init
-    git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+    git remote add origin https://github.com/ShivangPatel2602/asd-platform.git
 fi
 
 echo "Pulling latest code..."
