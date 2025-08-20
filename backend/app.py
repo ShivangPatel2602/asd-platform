@@ -1012,7 +1012,7 @@ def an_model():
         }
         
         # Call lab device computation service
-        lab_url = "https://2ee6d0e0fd14.ngrok-free.app"
+        lab_url = "https://2ee6d0e0fd14.ngrok-free.app/compute/an-model"
         
         print(f"Sending computation request to lab device: {lab_url}")
         
