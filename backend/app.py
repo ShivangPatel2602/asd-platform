@@ -7,6 +7,7 @@ from flask_mail import Mail, Message
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import json
+import requests
 import numpy as np
 from vectorized_combination import run_an_model
 
@@ -202,7 +203,7 @@ def get_elements_with_data():
     except Exception as e:
         print(f"Error getting elements with data: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
-
+    
 @app.route("/api/pending-submissions", methods=["GET"])
 def get_pending_submissions():
     user = session.get('user')
@@ -986,14 +987,84 @@ def filter_data():
                         "publications": [p["publication"] for p in cond.get("publications", [])]
                     })
     return jsonify(results)
-    
+
 @app.route("/api/an-model", methods=["POST"])
 def an_model():
-    data = request.get_json()
-    growth = np.array(data.get("growth", []))
-    nongrowth = np.array(data.get("nongrowth", []))
-    result = run_an_model(growth, nongrowth)
-    return jsonify(result)
+    try:
+        data = request.get_json()
+        growth = data.get("growth", [])
+        nongrowth = data.get("nongrowth", [])
+        
+        # Validate input data
+        if not growth or not nongrowth:
+            return jsonify({
+                "error": "Both growth and nongrowth data required",
+                "received": {
+                    "growth_points": len(growth),
+                    "nongrowth_points": len(nongrowth)
+                }
+            }), 400
+        
+        # Prepare data for lab device
+        lab_payload = {
+            "growth": growth,
+            "nongrowth": nongrowth
+        }
+        
+        # Call lab device computation service
+        lab_url = "https://2ee6d0e0fd14.ngrok-free.app"
+        
+        print(f"Sending computation request to lab device: {lab_url}")
+        
+        # Make request to lab device with timeout
+        response = requests.post(
+            lab_url,
+            json=lab_payload,
+            headers={
+                "Content-Type": "application/json",
+                "ngrok-skip-browser-warning": "true"  # Skip ngrok browser warning
+            },
+            timeout=300  # 5 minute timeout for computation
+        )
+        
+        # Check if request was successful
+        if response.status_code == 200:
+            result = response.json()
+            print(f"Lab computation successful. Best scenario: {result.get('best_scenario', 'Unknown')}")
+            return jsonify(result)
+        else:
+            error_msg = f"Lab device returned error: {response.status_code}"
+            try:
+                error_detail = response.json()
+                error_msg += f" - {error_detail.get('error', 'Unknown error')}"
+            except:
+                error_msg += f" - {response.text}"
+            
+            print(f"Lab device error: {error_msg}")
+            return jsonify({
+                "error": error_msg,
+                "fallback_message": "Computation failed on lab device"
+            }), 500
+            
+    except requests.exceptions.Timeout:
+        return jsonify({
+            "error": "Lab device computation timed out",
+            "message": "The computation is taking longer than expected"
+        }), 504
+        
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            "error": "Could not connect to lab device",
+            "message": "Please check if the lab device is online and the ngrok tunnel is active"
+        }), 503
+        
+    except Exception as e:
+        print(f"Error calling lab device: {str(e)}")
+        return jsonify({
+            "error": f"Failed to process computation request: {str(e)}",
+            "message": "An unexpected error occurred"
+        }), 500
+
     
 if __name__ == "__main__":
     app.run(port=5001, debug=True)

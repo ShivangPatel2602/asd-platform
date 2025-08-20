@@ -15,6 +15,12 @@ class Config:
     EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
     BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5001")
+    # Fixed: Use us-east-2 to match your Lambda function
+    AWS_DEFAULT_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-2')
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    LAMBDA_FUNCTION_NAME = os.environ.get('LAMBDA_FUNCTION_NAME', 'an-model-computation')
+    LAMBDA_TIMEOUT_THRESHOLD = 280  # Increased to match sync timeout
     
     ALLOWED_ORIGINS = [
         "http://localhost:3000",

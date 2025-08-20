@@ -1,4 +1,5 @@
 authlib
+boto3==1.28.85
 dotenv
 dnspython
 Flask
