@@ -10,6 +10,7 @@ import json
 import requests
 import numpy as np
 from vectorized_combination import run_an_model
+import traceback
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
@@ -988,12 +989,22 @@ def filter_data():
                     })
     return jsonify(results)
 
+# BACKEND FIX - Updated an_model endpoint and recompute function
+
 @app.route("/api/an-model", methods=["POST"])
 def an_model():
     try:
         data = request.get_json()
+        print(f"=== AN-MODEL ENDPOINT DEBUG ===")
+        print(f"Received data keys: {list(data.keys())}")
+        
         growth = data.get("growth", [])
         nongrowth = data.get("nongrowth", [])
+        custom_params = data.get("customParams", None)
+        
+        print(f"Growth data points: {len(growth)}")
+        print(f"Non-growth data points: {len(nongrowth)}")
+        print(f"Custom params present: {custom_params is not None}")
         
         # Validate input data
         if not growth or not nongrowth:
@@ -1005,7 +1016,54 @@ def an_model():
                 }
             }), 400
         
-        # Prepare data for lab device
+        # If custom parameters are provided, use them to recompute
+        if custom_params:
+            print(f"=== CUSTOM PARAMETER RECOMPUTATION ===")
+            try:
+                scenario_name = custom_params.get("scenario", "")
+                params = custom_params.get("params", [])
+                
+                print(f"Scenario: {scenario_name}")
+                print(f"Parameters received: {params}")
+                print(f"Parameter types: {[type(p) for p in params]}")
+                
+                # Validate parameters before proceeding
+                if not params or len(params) != 3:
+                    raise ValueError(f"Expected 3 parameters, got {len(params)}: {params}")
+                
+                # Check if vectorized_combination module is available
+                try:
+                    from vectorized_combination import AN_Model_py_vc_exact
+                    print("Successfully imported AN_Model_py_vc_exact")
+                except ImportError as ie:
+                    print(f"Import error: {ie}")
+                    return jsonify({
+                        "error": f"Computation module not available: {str(ie)}",
+                        "fallback_message": "Cannot import required computation functions"
+                    }), 500
+                
+                # Recompute model with custom parameters
+                result = recompute_with_custom_params(growth, nongrowth, scenario_name, params)
+                print(f"Recomputation successful. Returning result.")
+                return jsonify(result)
+                
+            except ValueError as ve:
+                print(f"Validation error: {str(ve)}")
+                return jsonify({
+                    "error": f"Parameter validation failed: {str(ve)}",
+                    "fallback_message": "Invalid parameter format or values"
+                }), 400
+                
+            except Exception as e:
+                print(f"Error recomputing with custom parameters: {str(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
+                return jsonify({
+                    "error": f"Custom parameter computation failed: {str(e)}",
+                    "fallback_message": "Parameter modification failed",
+                    "traceback": traceback.format_exc()[-500:] if hasattr(traceback, 'format_exc') else str(e)
+                }), 500
+        
+        # Regular computation path (existing code)
         lab_payload = {
             "growth": growth,
             "nongrowth": nongrowth
@@ -1022,9 +1080,9 @@ def an_model():
             json=lab_payload,
             headers={
                 "Content-Type": "application/json",
-                "ngrok-skip-browser-warning": "true"  # Skip ngrok browser warning
+                "ngrok-skip-browser-warning": "true"
             },
-            timeout=300  # 5 minute timeout for computation
+            timeout=300
         )
         
         # Check if request was successful
@@ -1060,11 +1118,115 @@ def an_model():
         
     except Exception as e:
         print(f"Error calling lab device: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
         return jsonify({
             "error": f"Failed to process computation request: {str(e)}",
             "message": "An unexpected error occurred"
         }), 500
 
+def recompute_with_custom_params(growth, nongrowth, scenario_name, params):
+    """
+    Recompute model with custom parameters - FIXED VERSION
+    """
+    try:
+        print(f"=== RECOMPUTE WITH CUSTOM PARAMS DEBUG ===")
+        print(f"Scenario: {scenario_name}")
+        print(f"Received params: {params} (type: {type(params)})")
+        
+        # Use the local AN model function with custom parameters
+        data1 = np.array(growth, dtype=np.float64)
+        data2 = np.array(nongrowth, dtype=np.float64)
+        
+        print(f"Data1 shape: {data1.shape}, Data2 shape: {data2.shape}")
+        
+        if len(data1) < 2:
+            raise ValueError("Growth data must have at least 2 points")
+        
+        # Calculate gdot and ncycles (same as in vectorized_combination.py)
+        growth_rate = np.sum((data1[1:,1] - data1[:-1,1]) / (data1[1:,0] - data1[:-1,0]))
+        gdot = growth_rate / (len(data1) - 1)
+        ncycles = int(data2[-1,0] * 1.5)
+        
+        print(f"Calculated: gdot={gdot:.6f}, ncycles={ncycles}")
+        
+        # Frontend always sends [nhat, ndot0, td] in that order
+        if len(params) != 3:
+            raise ValueError(f"Expected exactly 3 parameters [nhat, ndot0, td], got {len(params)}")
+        
+        nhat = float(params[0])
+        ndot0 = float(params[1]) 
+        td = int(float(params[2]))  # Convert to int but handle potential float input
+        
+        print(f"Parameter assignment:")
+        print(f"  nhat = {nhat}")
+        print(f"  ndot0 = {ndot0}")
+        print(f"  td = {td}")
+        
+        # FIXED: Import and call the correct function
+        try:
+            from vectorized_combination import AN_Model_py_vc_exact
+            print(f"Successfully imported AN_Model_py_vc_exact")
+        except ImportError as e:
+            print(f"Failed to import AN_Model_py_vc_exact: {e}")
+            raise ValueError(f"Cannot import computation function: {e}")
+        
+        # Run the model with custom parameters
+        print(f"Calling AN_Model_py_vc_exact with parameters...")
+        rmse, V = AN_Model_py_vc_exact(gdot, nhat, ndot0, td, ncycles, data2, return_V=True)
+        
+        if V is None:
+            raise ValueError("Model computation returned no results (V is None)")
+        
+        print(f"Model computation successful:")
+        print(f"  RMSE: {rmse}")
+        print(f"  V matrix shape: {V.shape}")
+        
+        # Prepare results in the same format as the original computation
+        model_x = V[:, 1].tolist()
+        model_growth_y = V[:, 2].tolist()
+        model_nongrowth_y = V[:, 3].tolist()
+        
+        print(f"Prepared output:")
+        print(f"  model_x length: {len(model_x)}")
+        print(f"  model_growth_y length: {len(model_growth_y)}")
+        print(f"  model_nongrowth_y length: {len(model_nongrowth_y)}")
+        
+        # Create scenario results with the custom parameters
+        scenario_results = {
+            scenario_name: {
+                'rmse': float(rmse),
+                'params': [nhat, ndot0, td],  # Return all three parameters
+                'model_x': model_x,
+                'model_growth_y': model_growth_y,
+                'model_nongrowth_y': model_nongrowth_y
+            }
+        }
+        
+        result = {
+            "best_scenario": scenario_name,
+            "best_rmse": float(rmse),
+            "best_params": [nhat, ndot0, td],
+            "growth": data1.tolist(),
+            "nongrowth": data2.tolist(),
+            "model_x": model_x,
+            "model_growth_y": model_growth_y,
+            "model_nongrowth_y": model_nongrowth_y,
+            "all_scenarios": scenario_results,
+            "computation_time": 0,
+            "custom_computation": True
+        }
+        
+        print(f"Successfully created result object")
+        print(f"Returning result with best_scenario: {result['best_scenario']}")
+        print(f"Returning result with best_params: {result['best_params']}")
+        
+        return result
+        
+    except Exception as e:
+        error_msg = f"Error in custom parameter computation: {str(e)}"
+        print(error_msg)
+        print(f"Traceback: {traceback.format_exc()}")
+        raise Exception(error_msg)
     
 if __name__ == "__main__":
     app.run(port=5001, debug=True)
