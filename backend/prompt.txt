@@ -1,0 +1,29 @@
+Extract Area Selective Deposition parameters from this research paper. Return ONLY explicitly stated information.
+Extract These 7 Parameters:
+
+Deposited Material - Target material (ZnO, TiO2, Al2O3, etc.)
+Element - Primary element from material formula (Zn, Ti, Al, etc.)
+Deposition Technique - Method used (ALD, CVD, PECVD, MLD, etc.)
+Precursor - Source compound used for deposition
+Coreactant - Reactive species (H2O, O2, NH3, plasma, etc.)
+Surface/Substrate - Base material (Si, SiO2, glass, metal, etc.)
+Surface Pretreatment - Cleaning/treatment before deposition
+
+Search Locations:
+Abstract, Methods/Experimental, Results, Tables, Figure captions, Supplementary info
+Common Terms:
+
+ASD: "selective deposition", "area-selective growth"
+Precursor: "metal source", "organometallic", "source material"
+Surface treatment: "surface prep", "cleaning", "activation"
+Output Format (JSON only):
+{
+  "deposited_material": "value or Not specified",
+  "element": "value or Not specified", 
+  "deposition_technique": "value or Not specified",
+  "precursor": "value or Not specified",
+  "coreactant": "value or Not specified",
+  "surface_substrate": "value or Not specified",
+  "surface_pretreatment": "value or Not specified",
+  "confidence": "high/medium/low"
+}

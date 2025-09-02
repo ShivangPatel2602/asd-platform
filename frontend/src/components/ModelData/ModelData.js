@@ -72,7 +72,86 @@ const VariableDescriptions = () => (
   </div>
 );
 
-const BestScenarioParams = ({ scenario, params, rmse, onParamsChange }) => {
+// NEW: Scenario Explanations Component
+const ScenarioExplanation = ({ scenario }) => {
+  const scenarioExplanations = {
+    "nhat only": {
+      title: "Initial Defects (n̂₀ only)",
+      explanation:
+        "The thickness data indicates that selectivity loss is caused by defects initially present on the non-growth surface",
+      recommendations: [
+        "Consider investigating the quality of the substrate materials and the effectiveness of initial surface passivation and cleaning processes",
+      ],
+    },
+    "ndot0 only": {
+      title: "Process-Generated Defects (ṅ₀ only)",
+      explanation:
+        "The thickness data indicates that selectivity loss is caused by defects generated on the non-growth surface by the deposition process",
+      recommendations: [
+        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
+      ],
+    },
+    "ndot0 and td": {
+      title: "Process-Generated Defects with Delay (ṅ₀ and td)",
+      explanation:
+        "The thickness data indicates that selectivity loss is caused by defects generated on the non-growth surface by the deposition process",
+      recommendations: [
+        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
+      ],
+    },
+    "nhat and ndot0": {
+      title: "Initial and Process-Generated Defects (n̂₀ and ṅ₀)",
+      explanation:
+        "The thickness data indicates that selectivity loss is caused by defects initially present on the non-growth surface and by defects generated on the non-growth surface by the deposition process",
+      recommendations: [
+        "Consider investigating the quality of the substrate materials and the effectiveness of initial surface passivation and cleaning processes",
+        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
+      ],
+    },
+    "nhat + ndot0 + td": {
+      title: "All Defect Mechanisms (n̂₀, ṅ₀, and td)",
+      explanation:
+        "The thickness data indicates that selectivity loss is caused by defects initially present on the non-growth surface and by defects generated on the non-growth surface by the deposition process",
+      recommendations: [
+        "Consider investigating the quality of the substrate materials and the effectiveness of initial surface passivation and cleaning processes",
+        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
+      ],
+    },
+  };
+
+  const scenarioInfo = scenarioExplanations[scenario];
+
+  if (!scenarioInfo) return null;
+
+  return (
+    <div className="scenario-explanation">
+      <h3>{scenarioInfo.title}</h3>
+      <div className="explanation-content">
+        <div className="explanation-text">
+          <strong>Analysis:</strong>
+          <p>{scenarioInfo.explanation}</p>
+        </div>
+        <div className="recommendations">
+          <strong>Recommendations:</strong>
+          <ul>
+            {scenarioInfo.recommendations.map((rec, index) => (
+              <li key={index}>{rec}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BestScenarioParams = ({
+  scenario,
+  params,
+  rmse,
+  onParamsChange,
+  onResetToOriginal,
+  hasBeenModified,
+}) => {
   const [editableParams, setEditableParams] = useState({
     nhat: 0,
     ndot0: 0,
@@ -218,12 +297,24 @@ const BestScenarioParams = ({ scenario, params, rmse, onParamsChange }) => {
 
       <div className="param-controls">
         {!isEditing ? (
-          <button
-            className="edit-params-btn"
-            onClick={() => setIsEditing(true)}
-          >
-            Modify Parameters
-          </button>
+          <div className="control-buttons">
+            <button
+              className="edit-params-btn"
+              onClick={() => setIsEditing(true)}
+            >
+              Modify Parameters
+            </button>
+            {/* NEW: Reset to Original button */}
+            {hasBeenModified && (
+              <button
+                className="reset-btn"
+                onClick={onResetToOriginal}
+                title="Reset to original computation results"
+              >
+                Reset to Original
+              </button>
+            )}
+          </div>
         ) : (
           <div className="edit-controls">
             <button className="apply-btn" onClick={handleApplyChanges}>
@@ -294,7 +385,26 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
   const [originalGrowthData, setOriginalGrowthData] = useState([]);
   const [originalNonGrowthData, setOriginalNonGrowthData] = useState([]);
 
-  const processModelResults = (result) => {
+  // NEW: Store original computation results for reset functionality
+  const [originalResults, setOriginalResults] = useState(null);
+  const [hasBeenModified, setHasBeenModified] = useState(false);
+
+  const handleResetToOriginal = () => {
+    if (originalResults) {
+      console.log("Resetting to original results:", originalResults);
+
+      // Reset all state to original computation results
+      processModelResults(originalResults, false); // Don't mark as original again
+      setHasBeenModified(false);
+
+      console.log(
+        "Reset complete - back to original scenario:",
+        originalResults.best_scenario
+      );
+    }
+  };
+
+  const processModelResults = (result, isOriginalComputation = false) => {
     setScenarioResults(result.all_scenarios);
     setBestScenario(result.best_scenario);
     setBestRmse(result.best_rmse);
@@ -303,6 +413,22 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
     // Store original data for parameter modification
     setOriginalGrowthData(result.growth);
     setOriginalNonGrowthData(result.nongrowth);
+
+    // NEW: Store original results for reset functionality
+    if (isOriginalComputation) {
+      setOriginalResults({
+        all_scenarios: result.all_scenarios,
+        best_scenario: result.best_scenario,
+        best_rmse: result.best_rmse,
+        best_params: result.best_params,
+        growth: result.growth,
+        nongrowth: result.nongrowth,
+        model_x: result.model_x,
+        model_growth_y: result.model_growth_y,
+        model_nongrowth_y: result.model_nongrowth_y,
+      });
+      setHasBeenModified(false);
+    }
 
     // Build combined data for chart
     const allX = Array.from(
@@ -373,7 +499,7 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
       });
       const result = await response.json();
 
-      processModelResults(result);
+      processModelResults(result, true); // NEW: Mark this as original computation
     } catch (error) {
       console.error("Error processing data:", error);
     } finally {
@@ -426,6 +552,7 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
       }
 
       processModelResults(result);
+      setHasBeenModified(true); // NEW: Mark that parameters have been modified
     } catch (error) {
       console.error("Error recomputing with new parameters:", error);
       alert(`Error recomputing: ${error.message}`);
@@ -567,12 +694,17 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
                 </LineChart>
               </ResponsiveContainer>
 
+              {/* NEW: Scenario Explanation - appears right after the chart */}
+              <ScenarioExplanation scenario={bestScenario} />
+
               {/* Best scenario parameters */}
               <BestScenarioParams
                 scenario={bestScenario}
                 params={bestParams}
                 rmse={bestRmse}
                 onParamsChange={handleParamsChange}
+                onResetToOriginal={handleResetToOriginal}
+                hasBeenModified={hasBeenModified}
               />
             </div>
           ) : (

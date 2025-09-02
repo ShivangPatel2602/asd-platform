@@ -392,3 +392,143 @@
   color: #9ca3af;
   font-weight: 400;
 }
+
+.scenario-explanation {
+  background: #f0f9ff;
+  border: 1.5px solid #0284c7;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.scenario-explanation h3 {
+  margin: 0 0 16px 0;
+  color: #0369a1;
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scenario-explanation h3::before {
+  content: "🔍";
+  font-size: 1.1rem;
+}
+
+.explanation-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.explanation-text {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #0284c7;
+}
+
+.explanation-text strong {
+  color: #0369a1;
+  font-size: 1rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.explanation-text p {
+  margin: 0;
+  color: #1e293b;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.recommendations {
+  background: #ecfccb;
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #65a30d;
+}
+
+.recommendations strong {
+  color: #365314;
+  font-size: 1rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.recommendations ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #374151;
+}
+
+.recommendations li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.recommendations li:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .scenario-explanation {
+    padding: 16px;
+    margin: 16px 0;
+  }
+
+  .explanation-content {
+    gap: 12px;
+  }
+
+  .explanation-text,
+  .recommendations {
+    padding: 12px;
+  }
+}
+
+/* Control buttons layout */
+.control-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Reset button styles */
+.reset-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f59e0b;
+  color: white;
+  border: 1px solid #d97706;
+}
+
+.reset-btn:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2);
+}
+
+.reset-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsive design for control buttons */
+@media (max-width: 768px) {
+  .control-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reset-btn {
+    width: 100%;
+  }
+}
