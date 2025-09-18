@@ -242,53 +242,140 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
                 Extraction Confidence: {extractionConfidence.toUpperCase()}
               </div>
             )}
-            {sections.map((section) => (
-              <div key={section.title} className="form-section">
-                <h2 className="section-title">{section.title}</h2>
+
+            {/* First row: Material Information + Process Parameters */}
+            <div className="form-sections-row">
+              <div className="form-section">
+                <h2 className="section-title">Material Information</h2>
                 <div className="section-fields">
-                  {section.fields.map(
-                    ({ id, label, icon, type, fullWidth }) => (
-                      <div
-                        key={id}
-                        className={`field-container ${
-                          fullWidth ? "full-width" : ""
-                        }`}
-                      >
-                        <span className="field-icon">{icon}</span>
-                        <LabeledInput
-                          id={id}
-                          label={label}
-                          type={type}
-                          value={form[id]}
-                          onChange={handleChange}
-                        />
-                      </div>
-                    )
-                  )}
+                  <div className="field-container">
+                    <span className="field-icon">⚛️</span>
+                    <LabeledInput
+                      id="element"
+                      label="Element"
+                      value={form.element}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="field-container">
+                    <span className="field-icon">🧪</span>
+                    <LabeledInput
+                      id="material"
+                      label="Material"
+                      value={form.material}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="field-container">
+                    <span className="field-icon">🔧</span>
+                    <LabeledInput
+                      id="technique"
+                      label="Technique of Deposition"
+                      value={form.technique}
+                      onChange={handleChange}
+                    />
+                  </div>
                 </div>
               </div>
-            ))}
-            <div className="form-section">
-              <h2 className="section-title">
-                <span className="field-icon">👤</span>
-                Authors
-              </h2>
-              <AuthorsInput
-                authors={form.publication.authors || [""]}
-                onAuthorsChange={(authors) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    publication: {
-                      ...prev.publication,
-                      authors,
-                    },
-                  }))
-                }
-              />
+
+              <div className="form-section">
+                <h2 className="section-title">Process Parameters</h2>
+                <div className="section-fields">
+                  <div className="field-container">
+                    <span className="field-icon">🔥</span>
+                    <LabeledInput
+                      id="precursor"
+                      label="Precursor"
+                      value={form.precursor}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="field-container">
+                    <span className="field-icon">⚡</span>
+                    <LabeledInput
+                      id="coreactant"
+                      label="Co-reactant"
+                      value={form.coreactant}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="field-container">
+                    <span className="field-icon">🌡️</span>
+                    <LabeledInput
+                      id="temperature"
+                      label="Temperature (°C)"
+                      type="number"
+                      value={form.temperature}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Second row: Publication Details + Authors */}
+            <div className="form-sections-row">
+              <div className="form-section">
+                <h2 className="section-title">Publication Details</h2>
+                <div className="section-fields">
+                  <div className="field-container">
+                    <span className="field-icon">📰</span>
+                    <LabeledInput
+                      id="publication.journal"
+                      label="Journal Abbreviation"
+                      value={form.publication.journal}
+                      onChange={handleChange}
+                      placeholder="e.g., ACS Nano"
+                    />
+                  </div>
+                  <div className="field-container">
+                    <span className="field-icon">📅</span>
+                    <LabeledInput
+                      id="publication.year"
+                      label="Publication Year"
+                      type="number"
+                      value={form.publication.year}
+                      onChange={handleChange}
+                      placeholder="e.g., 2023"
+                    />
+                  </div>
+                  <div className="field-container">
+                    <span className="field-icon">🔗</span>
+                    <LabeledInput
+                      id="publication.doi"
+                      label="DOI"
+                      value={form.publication.doi}
+                      onChange={handleChange}
+                      placeholder="e.g., 10.1021/example"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h2 className="section-title">
+                  <span className="field-icon">👤</span>
+                  Authors
+                </h2>
+                <AuthorsInput
+                  authors={form.publication.authors || [""]}
+                  onAuthorsChange={(authors) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      publication: {
+                        ...prev.publication,
+                        authors,
+                      },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Full width: Surface Details */}
             <div className="form-section">
               <h2 className="section-title">
-                <span className="field-icon">🔍</span>
+                <span className="field-icon">📊</span>
                 Surface Details and Measurements
               </h2>
               <SurfaceReadingsInput

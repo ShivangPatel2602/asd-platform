@@ -26,7 +26,11 @@ const parseInput = (input) => {
     .filter(Boolean);
 };
 
-// Mathematical notation component
+const formatToThreeDecimals = (value) => {
+  if (value === null || value === undefined || isNaN(value)) return "N/A";
+  return Number(value).toFixed(3);
+};
+
 const MathVariable = ({ variable }) => {
   const mathMap = {
     nhat: (
@@ -48,7 +52,6 @@ const MathVariable = ({ variable }) => {
   return mathMap[variable] || variable;
 };
 
-// Variable descriptions component
 const VariableDescriptions = () => (
   <div className="variable-descriptions">
     <h3>Model Parameters</h3>
@@ -73,50 +76,32 @@ const VariableDescriptions = () => (
   </div>
 );
 
-// NEW: Scenario Explanations Component
 const ScenarioExplanation = ({ scenario }) => {
   const scenarioExplanations = {
     "nhat only": {
       title: "Initial Defects (n̂₀ only)",
       explanation:
         "The thickness data indicates that selectivity loss is caused by defects initially present on the non-growth surface",
-      recommendations: [
-        "Consider investigating the quality of the substrate materials and the effectiveness of initial surface passivation and cleaning processes",
-      ],
     },
     "ndot0 only": {
       title: "Process-Generated Defects (ṅ₀ only)",
       explanation:
         "The thickness data indicates that selectivity loss is caused by defects generated on the non-growth surface by the deposition process",
-      recommendations: [
-        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
-      ],
     },
     "ndot0 and td": {
       title: "Process-Generated Defects with Delay (ṅ₀ and td)",
       explanation:
         "The thickness data indicates that selectivity loss is caused by defects generated on the non-growth surface by the deposition process",
-      recommendations: [
-        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
-      ],
     },
     "nhat and ndot0": {
       title: "Initial and Process-Generated Defects (n̂₀ and ṅ₀)",
       explanation:
         "The thickness data indicates that selectivity loss is caused by defects initially present on the non-growth surface and by defects generated on the non-growth surface by the deposition process",
-      recommendations: [
-        "Consider investigating the quality of the substrate materials and the effectiveness of initial surface passivation and cleaning processes",
-        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
-      ],
     },
     "nhat + ndot0 + td": {
       title: "All Defect Mechanisms (n̂₀, ṅ₀, and td)",
       explanation:
         "The thickness data indicates that selectivity loss is caused by defects initially present on the non-growth surface and by defects generated on the non-growth surface by the deposition process",
-      recommendations: [
-        "Consider investigating the quality of the substrate materials and the effectiveness of initial surface passivation and cleaning processes",
-        "Consider intermittently regenerating the surface passivation or periodically etching away nuclei during deposition",
-      ],
     },
   };
 
@@ -131,14 +116,6 @@ const ScenarioExplanation = ({ scenario }) => {
         <div className="explanation-text">
           <strong>Analysis:</strong>
           <p>{scenarioInfo.explanation}</p>
-        </div>
-        <div className="recommendations">
-          <strong>Recommendations:</strong>
-          <ul>
-            {scenarioInfo.recommendations.map((rec, index) => (
-              <li key={index}>{rec}</li>
-            ))}
-          </ul>
         </div>
       </div>
     </div>
@@ -251,7 +228,7 @@ const BestScenarioParams = ({
     <div className="best-scenario-params">
       <h3>Best Scenario: {scenario}</h3>
       <div className="rmse-display">
-        <strong>RMSE:</strong> {rmse?.toExponential(4) || "N/A"}
+        <strong>RMSE:</strong> {formatToThreeDecimals(rmse)}
       </div>
 
       <div className="params-display">
@@ -289,7 +266,7 @@ const BestScenarioParams = ({
                   isParamActive(label) ? "active" : "inactive"
                 }`}
               >
-                {getParamValue(label).toExponential(4)}
+                {formatToThreeDecimals(getParamValue(label))}
               </span>
             )}
           </div>
@@ -591,29 +568,27 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
         <div className="model-data-left">
           <VariableDescriptions />
 
-          <div className="input-group">
-            <label htmlFor="growth-input">
-              Growth Surface Data (x, y per line)
-            </label>
-            <textarea
-              id="growth-input"
-              value={growthInput}
-              onChange={(e) => setGrowthInput(e.target.value)}
-              placeholder="e.g.\n0 0\n25 1.5\n96 6\n144 9.1\n240 15.2\n336 21.5"
-              rows={8}
-            />
-          </div>
-          <div className="input-group">
-            <label htmlFor="non-growth-input">
-              Non-Growth Surface Data (x, y per line)
-            </label>
-            <textarea
-              id="non-growth-input"
-              value={nonGrowthInput}
-              onChange={(e) => setNonGrowthInput(e.target.value)}
-              placeholder="e.g.\n0 0\n25 0.5\n96 2\n144 3.1\n240 5.2\n336 7.5"
-              rows={8}
-            />
+          <div className="input-row">
+            <div className="input-group half-width">
+              <label htmlFor="growth-input">Growth Surface Data</label>
+              <textarea
+                id="growth-input"
+                value={growthInput}
+                onChange={(e) => setGrowthInput(e.target.value)}
+                placeholder="e.g.\n0 0\n25 1.5\n96 6\n144 9.1\n240 15.2\n336 21.5"
+                rows={8}
+              />
+            </div>
+            <div className="input-group half-width">
+              <label htmlFor="non-growth-input">Non-Growth Surface Data</label>
+              <textarea
+                id="non-growth-input"
+                value={nonGrowthInput}
+                onChange={(e) => setNonGrowthInput(e.target.value)}
+                placeholder="e.g.\n0 0\n25 0.5\n96 2\n144 3.1\n240 5.2\n336 7.5"
+                rows={8}
+              />
+            </div>
           </div>
           <button
             className="plot-btn"
@@ -623,22 +598,28 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
             {isLoading ? "Processing..." : "Plot Data"}
           </button>
 
-          {/* Display scenario results */}
           {showPlot && Object.keys(scenarioResults).length > 0 && (
             <div className="scenario-results">
               <h3>All Scenarios</h3>
               <div className="all-scenarios">
-                {Object.entries(scenarioResults).map(([name, result]) => (
-                  <div
-                    key={name}
-                    className={`scenario-item ${
-                      name === bestScenario ? "best" : ""
-                    }`}
-                  >
-                    <strong>{name}:</strong> RMSE ={" "}
-                    {result.rmse.toExponential(4)}
-                  </div>
-                ))}
+                {Object.entries(scenarioResults).map(([name, result]) => {
+                  const displayName = name
+                    .replace(/nhat/g, "n̂₀")
+                    .replace(/ndot0/g, "ṅ₀")
+                    .replace(/td/g, "tₑ");
+
+                  return (
+                    <div
+                      key={name}
+                      className={`scenario-item ${
+                        name === bestScenario ? "best" : ""
+                      }`}
+                    >
+                      <strong>{displayName}:</strong> RMSE ={" "}
+                      {formatToThreeDecimals(result.rmse)}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -717,18 +698,21 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
                 </LineChart>
               </ResponsiveContainer>
 
-              {/* NEW: Scenario Explanation - appears right after the chart */}
-              <ScenarioExplanation scenario={bestScenario} />
-
-              {/* Best scenario parameters */}
-              <BestScenarioParams
-                scenario={bestScenario}
-                params={bestParams}
-                rmse={bestRmse}
-                onParamsChange={handleParamsChange}
-                onResetToOriginal={handleResetToOriginal}
-                hasBeenModified={hasBeenModified}
-              />
+              <div className="bottom-content">
+                <div className="bottom-left">
+                  <ScenarioExplanation scenario={bestScenario} />
+                </div>
+                <div className="bottom-right">
+                  <BestScenarioParams
+                    scenario={bestScenario}
+                    params={bestParams}
+                    rmse={bestRmse}
+                    onParamsChange={handleParamsChange}
+                    onResetToOriginal={handleResetToOriginal}
+                    hasBeenModified={hasBeenModified}
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <div className="plot-placeholder">

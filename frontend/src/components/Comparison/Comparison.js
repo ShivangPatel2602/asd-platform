@@ -44,6 +44,23 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const techniqueParam = params.get("technique");
   const isSurfaceMode = !!surfaceParam;
 
+  const elementModeColumns = [
+    "material",
+    "technique",
+    "precursor",
+    "coreactant",
+    "pretreatment",
+    "surface",
+  ];
+  const surfaceModeColumns = [
+    "surface",
+    "material",
+    "technique",
+    "precursor",
+    "coreactant",
+    "pretreatment",
+  ];
+
   useEffect(() => {
     setIsLoading(true);
     setError("");
@@ -134,6 +151,13 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
       }
     }
   }, [isSurfaceMode, elementData, element]);
+
+  const mergedRows = useMemo(() => {
+    return getOptimallyMergedRows(
+      elementData,
+      isSurfaceMode ? surfaceModeColumns : elementModeColumns
+    );
+  }, [elementData, isSurfaceMode]);
 
   const handlePublicationSelect = (rowKey, publication) => {
     setSelectedPublications((prev) => {
@@ -331,28 +355,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     return mergedRows;
   }
 
-  const elementModeColumns = [
-    "material",
-    "technique",
-    "precursor",
-    "coreactant",
-    "pretreatment",
-    "surface",
-  ];
-  const surfaceModeColumns = [
-    "surface",
-    "material",
-    "technique",
-    "precursor",
-    "coreactant",
-    "pretreatment",
-  ];
-
-  const mergedRows = getOptimallyMergedRows(
-    elementData,
-    isSurfaceMode ? surfaceModeColumns : elementModeColumns
-  );
-
   const handleDOIClick = (doi) => {
     if (!doi) return;
 
@@ -446,8 +448,23 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     );
   };
 
-  const TableControls = ({ totalRows, currentRows, onSearch, onJumpToRow }) => {
-    const [searchTerm, setSearchTerm] = useState("");
+  const handleJumpToRow = (rowNum) => {
+    const tableBody = document.querySelector("tbody");
+    const targetRow = tableBody?.children[rowNum - 1];
+
+    if (targetRow) {
+      targetRow.classList.add("highlighted-row");
+      targetRow.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      setTimeout(() => {
+        targetRow.classList.remove("highlighted-row");
+      }, 3000);
+    }
+  };
+
+  const TableControls = ({ totalRows, currentRows, onJumpToRow }) => {
     const [jumpRow, setJumpRow] = useState("");
 
     return (
@@ -462,16 +479,6 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           </span>
         </div>
         <div className="search-controls">
-          <input
-            type="text"
-            className="table-search"
-            placeholder="Search datasets..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              onSearch(e.target.value);
-            }}
-          />
           <div className="jump-to-row">
             <span>Jump to:</span>
             <input
@@ -824,12 +831,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                   <TableControls
                     totalRows={mergedRows.length}
                     currentRows={mergedRows.length}
-                    onSearch={(term) => {
-                      console.log("Searching for:", term);
-                    }}
-                    onJumpToRow={(rowNum) => {
-                      console.log("Jumping to row:", rowNum);
-                    }}
+                    onJumpToRow={handleJumpToRow}
                   />
                   <table className={isSurfaceMode ? "surface-mode-table" : ""}>
                     <thead>
