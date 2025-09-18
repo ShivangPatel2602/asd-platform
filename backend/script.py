@@ -8,6 +8,7 @@ import google.generativeai as genai
 from pathlib import Path
 import logging
 from dataclasses import dataclass
+from config import Config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -319,7 +320,7 @@ class ASDParameterExtractor:
 def main():
     """Example usage"""
     # Configuration
-    GEMINI_API_KEY = "AIzaSyDj3Eo0d6BRjPWiPjyNweRwEYAzMd4J3ck"
+    GEMINI_API_KEY = Config.GEMINI_API_KEY
     PDF_PATH = "LLM Training/Park et al 2006 Full Paper.pdf"
     
     extractor = ASDParameterExtractor(GEMINI_API_KEY)
