@@ -3,6 +3,8 @@ import LabeledInput from "./LabeledInput";
 import Navbar from "../Navbar/Navbar";
 import { submitFormData } from "../../services/api";
 import SurfaceReadingsInput from "./SurfaceReadings";
+import AuthorsInput from "./AuthorsInput";
+import PDFUploader from "../PDFUploader/PDFUploader";
 import "./FormInput.css";
 
 const FormInput = ({ setUser, user, isAuthorized }) => {
@@ -14,7 +16,7 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
     coreactant: "",
     temperature: "",
     publication: {
-      author: "",
+      authors: [""],
       journal: "",
       year: "",
       doi: "",
@@ -30,6 +32,8 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
   ]);
 
   const [status, setStatus] = useState("");
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
+  const [extractionConfidence, setExtractionConfidence] = useState(null);
 
   const sections = [
     {
@@ -57,12 +61,6 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
       title: "Publication Details",
       fields: [
         {
-          id: "publication.author",
-          label: "First Author",
-          icon: "👤",
-          placeholder: "e.g., Smith",
-        },
-        {
           id: "publication.journal",
           label: "Journal Abbreviation",
           icon: "📰",
@@ -84,6 +82,33 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
       ],
     },
   ];
+
+  const handlePDFDataExtracted = (extractedData, confidence) => {
+    setForm((prev) => ({
+      ...prev,
+      element: extractedData.element || prev.element,
+      material: extractedData.material || prev.material,
+      technique: extractedData.technique || prev.technique,
+      precursor: extractedData.precursor || prev.precursor,
+      coreactant: extractedData.coreactant || prev.coreactant,
+    }));
+
+    // Update surfaces if data is available
+    if (extractedData.surface || extractedData.pretreatment) {
+      setSurfaces([
+        {
+          surface: extractedData.surface || "",
+          pretreatment: extractedData.pretreatment || "",
+          rawData: "",
+        },
+      ]);
+    }
+
+    setExtractionConfidence(confidence);
+    setStatus(
+      `PDF data extracted successfully! Confidence: ${confidence}. Please review and complete the form.`
+    );
+  };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -128,15 +153,21 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.publication.author || !form.publication.journal || !form.publication.year) {
-        setStatus("Please fill in all publication details");
-        return;
+    if (
+      !form.publication.authors.some((author) => author.trim()) ||
+      !form.publication.journal ||
+      !form.publication.year
+    ) {
+      setStatus(
+        "Please fill in at least one author and all other publication details"
+      );
+      return;
     }
 
     const year = parseInt(form.publication.year);
     if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) {
-        setStatus("Please enter a valid publication year");
-        return;
+      setStatus("Please enter a valid publication year");
+      return;
     }
 
     try {
@@ -176,11 +207,11 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
         coreactant: "",
         temperature: "",
         publication: {
-                author: "",
-                journal: "",
-                year: "",
-                doi: ""
-            },
+          author: "",
+          journal: "",
+          year: "",
+          doi: "",
+        },
       });
     } catch (error) {
       setStatus("Failed to save data");
@@ -195,6 +226,22 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
         <h1 className="form-title">Submit New Data</h1>
         <form onSubmit={handleSubmit} className="form-container">
           <div className="form-sections">
+            <h2 className="section-title">
+              <span className="field-icon">🤖</span>
+              AI-Assisted Data Extraction
+            </h2>
+            <PDFUploader
+              onDataExtracted={handlePDFDataExtracted}
+              isLoading={isPDFLoading}
+              setIsLoading={setIsPDFLoading}
+            />
+            {extractionConfidence && (
+              <div
+                className={`confidence-indicator confidence-${extractionConfidence}`}
+              >
+                Extraction Confidence: {extractionConfidence.toUpperCase()}
+              </div>
+            )}
             {sections.map((section) => (
               <div key={section.title} className="form-section">
                 <h2 className="section-title">{section.title}</h2>
@@ -221,7 +268,24 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
                 </div>
               </div>
             ))}
-
+            <div className="form-section">
+              <h2 className="section-title">
+                <span className="field-icon">👤</span>
+                Authors
+              </h2>
+              <AuthorsInput
+                authors={form.publication.authors || [""]}
+                onAuthorsChange={(authors) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    publication: {
+                      ...prev.publication,
+                      authors,
+                    },
+                  }))
+                }
+              />
+            </div>
             <div className="form-section">
               <h2 className="section-title">
                 <span className="field-icon">🔍</span>

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "../Navbar/Navbar";
 import "./ModelData.css";
+import { useLocation } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -388,6 +389,28 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
   // NEW: Store original computation results for reset functionality
   const [originalResults, setOriginalResults] = useState(null);
   const [hasBeenModified, setHasBeenModified] = useState(false);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    // Handle data passed from comparison page
+    if (location.state) {
+      const { growthInput, nonGrowthInput, autoCompute } = location.state;
+
+      if (growthInput && nonGrowthInput) {
+        setGrowthInput(growthInput);
+        setNonGrowthInput(nonGrowthInput);
+
+        // Auto-compute if requested
+        if (autoCompute) {
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            handlePlot();
+          }, 100);
+        }
+      }
+    }
+  }, [location.state]);
 
   const handleResetToOriginal = () => {
     if (originalResults) {

@@ -360,6 +360,16 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     window.open(doiUrl, "_blank");
   };
 
+  const formatAuthors = (authors) => {
+    if (!authors || authors.length === 0) return "Unknown";
+    if (typeof authors === "string") return authors; // Handle legacy data
+
+    if (authors.length === 1) return authors[0];
+    if (authors.length === 2) return `${authors[0]} & ${authors[1]}`;
+    if (authors.length <= 4) return `${authors[0]} et al.`;
+    return `${authors[0]} et al. (${authors.length} authors)`;
+  };
+
   const PublicationCell = ({ publications, index, onSelect }) => {
     const currentSelections = selectedPublications[index] || [];
 
@@ -373,14 +383,21 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           >
             <span
               className={`publication-tag ${
-                currentSelections.some((p) => p.author === pub.author)
+                currentSelections.some(
+                  (p) =>
+                    (p.authors?.[0] || p.author) ===
+                    (pub.authors?.[0] || pub.author)
+                )
                   ? "selected"
                   : ""
               }`}
               onClick={() => onSelect(index, pub)}
+              title={pub.authors ? `Authors: ${pub.authors.join(", ")}` : ""}
             >
               <span className="publication-index">{pubIndex + 1}</span>
-              {`${pub.author}, ${pub.journal} ${pub.year}`}
+              {`${formatAuthors(pub.authors || [pub.author])}, ${pub.journal} ${
+                pub.year
+              }`}
             </span>
           </div>
         ))}
@@ -388,30 +405,90 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     );
   };
 
-  const DOICell = ({ publications }) => {
+  const EnhancedDOICell = ({ publications }) => {
+    const hasPublishedDOI = publications.some((pub) => pub.doi);
+
     return (
-      <div className="doi-list">
-        {publications.map((pub, pubIndex) => (
-          <div key={pubIndex} className="doi-entry" data-pub-index={pubIndex}>
-            <span className="doi-wrapper">
-              <span className="doi-index">{pubIndex + 1}.</span>
-              {pub.doi ? (
-                <span
-                  className="doi-link"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDOIClick(pub.doi);
-                  }}
-                  title={`View publication: ${pub.doi}`}
-                >
-                  {`${pub.author}, ${pub.journal} ${pub.year}`}
-                </span>
-              ) : (
-                <span className="doi-not-available">Not uploaded</span>
-              )}
-            </span>
+      <div className={`doi-cell ${hasPublishedDOI ? "has-doi" : "no-doi"}`}>
+        <div
+          className={`doi-status-indicator ${
+            hasPublishedDOI ? "published" : "unpublished"
+          }`}
+        ></div>
+        <div className="doi-tooltip">
+          {hasPublishedDOI
+            ? "Published Research Available"
+            : "Unpublished Research Data"}
+        </div>
+        <div className="doi-list">
+          {publications.map((pub, pubIndex) => (
+            <div key={pubIndex} className="doi-entry">
+              <span className="doi-wrapper">
+                <span className="doi-index">{pubIndex + 1}.</span>
+                {pub.doi ? (
+                  <span
+                    className="doi-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDOIClick(pub.doi);
+                    }}
+                  >
+                    {`${pub.author}, ${pub.journal} ${pub.year}`}
+                  </span>
+                ) : (
+                  <span className="doi-not-available">Unpublished</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const TableControls = ({ totalRows, currentRows, onSearch, onJumpToRow }) => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [jumpRow, setJumpRow] = useState("");
+
+    return (
+      <div className="table-stats">
+        <div className="rows-info">
+          <span>
+            Showing {currentRows} of {totalRows} entries
+          </span>
+          <span className="data-quality-indicator">
+            Research Quality: {Math.round((currentRows / totalRows) * 100)}%
+            Coverage
+          </span>
+        </div>
+        <div className="search-controls">
+          <input
+            type="text"
+            className="table-search"
+            placeholder="Search datasets..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              onSearch(e.target.value);
+            }}
+          />
+          <div className="jump-to-row">
+            <span>Jump to:</span>
+            <input
+              type="number"
+              className="jump-input"
+              placeholder="Row #"
+              value={jumpRow}
+              onChange={(e) => setJumpRow(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  onJumpToRow(parseInt(jumpRow));
+                  setJumpRow("");
+                }
+              }}
+            />
           </div>
-        ))}
+        </div>
       </div>
     );
   };
@@ -597,6 +674,45 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     });
   };
 
+  const handleModelDataRedirect = () => {
+    // Extract data from the two selected readings
+    const readingsArray = Object.values(readings);
+    if (readingsArray.length !== 2) return;
+
+    const [data1, data2] = readingsArray;
+
+    // Format data for model input
+    const growthData = data1
+      .map((reading) => `${reading.cycles} ${reading.thickness}`)
+      .join("\n");
+    const nonGrowthData = data2
+      .map((reading) => `${reading.cycles} ${reading.thickness}`)
+      .join("\n");
+
+    // Navigate to model-data page with the data
+    navigate("/model-data", {
+      state: {
+        growthInput: growthData,
+        nonGrowthInput: nonGrowthData,
+        autoCompute: true,
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (showPlots) {
+      setTimeout(() => {
+        const chartContainers = document.querySelectorAll(
+          ".plots-container .chart-container"
+        );
+        chartContainers.forEach((container, index) => {
+          container.style.animationDelay = `${0.6 + index * 0.2}s`;
+          container.classList.add("animate-in");
+        });
+      }, 100);
+    }
+  }, [showPlots]);
+
   const renderActionButtons = (row) => (
     <div className="action-buttons">
       <button
@@ -705,6 +821,16 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
             <div className={`main-content ${showPlots ? "with-plots" : ""}`}>
               <div className={`table-section ${showPlots ? "with-plots" : ""}`}>
                 <div className="table-container">
+                  <TableControls
+                    totalRows={mergedRows.length}
+                    currentRows={mergedRows.length}
+                    onSearch={(term) => {
+                      console.log("Searching for:", term);
+                    }}
+                    onJumpToRow={(rowNum) => {
+                      console.log("Jumping to row:", rowNum);
+                    }}
+                  />
                   <table className={isSurfaceMode ? "surface-mode-table" : ""}>
                     <thead>
                       <tr>
@@ -717,7 +843,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                             <th>Co-reactant</th>
                             <th>Pretreatment</th>
                             <th>Dataset</th>
-                            <th>Publication</th>
+                            <th>Source</th>
                             <th>Edit</th>
                           </>
                         ) : (
@@ -729,7 +855,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                             <th>Pretreatment</th>
                             <th>Surface</th>
                             <th>Dataset</th>
-                            <th>Publication</th>
+                            <th>Source</th>
                             <th>Edit</th>
                           </>
                         )}
@@ -815,7 +941,9 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                               />
                             </td>
                             <td>
-                              <DOICell publications={row.publications} />
+                              <EnhancedDOICell
+                                publications={row.publications}
+                              />
                             </td>
                             <td>{renderActionButtons(row)}</td>
                           </tr>
@@ -838,6 +966,15 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                       <span>✕</span>
                       Collapse Plots
                     </button>
+                    {Object.keys(readings).length === 2 && (
+                      <button
+                        className="model-data-btn"
+                        onClick={handleModelDataRedirect}
+                      >
+                        <span>📊</span>
+                        Model Data
+                      </button>
+                    )}
                     <button
                       className="clear-button"
                       onClick={handleClearSelections}

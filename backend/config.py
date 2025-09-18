@@ -20,7 +20,8 @@ class Config:
     AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
     LAMBDA_FUNCTION_NAME = os.environ.get('LAMBDA_FUNCTION_NAME', 'an-model-computation')
-    LAMBDA_TIMEOUT_THRESHOLD = 280  # Increased to match sync timeout
+    LAMBDA_TIMEOUT_THRESHOLD = 280
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     
     ALLOWED_ORIGINS = [
         "http://localhost:3000",

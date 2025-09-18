@@ -5,6 +5,7 @@ dnspython
 Flask
 Flask-Mail
 flask-cors
+google-generativeai
 gunicorn
 numba
 numpy
@@ -13,6 +14,8 @@ pandas
 plotly
 pymongo
 pymongo[srv]
+PyPDF2
+PyMuPDF
 requests
 scipy
 scikit-optimize

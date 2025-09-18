@@ -1,219 +1,319 @@
 .periodic-table-container {
-    padding: 20px;
-    max-width: 1400px;
-    margin: 0 auto;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fadeInUp 0.1s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .periodic-table {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: fit-content;
 }
 
 .row {
-    display: flex;
-    gap: 4px;
-    justify-content: flex-start;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-start;
 }
 
 .element {
-    width: 64px;
-    height: 64px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    padding: 4px;
-    transition: all 0.2s ease;
-    background: white;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  padding: 4px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
 }
 
 .element.empty {
-    border: none;
-    cursor: default;
+  border: none;
+  cursor: default;
 }
 
 .element.has-data {
-    border: 2px solid #2563eb;
+  border: 2px solid #0369a1;
+  box-shadow: 0 4px 12px rgba(3, 105, 161, 0.2);
 }
 
 .element.no-data {
-    opacity: 0.7;
+  opacity: 0.8;
+  filter: grayscale(0.3);
 }
 
 .element:hover {
-    z-index: 1;
+  z-index: 1;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
 .element.has-data:hover {
-    transform: scale(1.2);
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transform: scale(1.15) translateZ(0);
+  z-index: 10;
+  box-shadow: 0 12px 30px rgba(3, 105, 161, 0.3);
+  border-color: #0284c7;
 }
 
 .element.no-data:hover {
-    transform: scale(1.1);
-    opacity: 0.9;
+  transform: scale(1.08) translateZ(0);
+  opacity: 0.8;
+  filter: grayscale(0.1);
 }
 
 .atomic-number {
-    font-size: 0.7em;
-    position: absolute;
-    top: 2px;
-    left: 4px;
+  font-size: 0.65em;
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.7);
 }
 
 .symbol {
-    font-size: 1.2em;
-    font-weight: bold;
-    margin-bottom: 2px;
+  font-size: 1.3em;
+  font-weight: 800;
+  margin-bottom: 1px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .name {
-    font-size: 0.6em;
-    text-align: center;
-    line-height: 1;
+  font-size: 0.55em;
+  text-align: center;
+  line-height: 1;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.8);
 }
 
 .element-spacer-first {
-    width: calc(64px * 16 + 4px * 15);
+  width: calc(64px * 16 + 4px * 15);
 }
 
 .element-spacer {
-    width: calc(64px * 10 + 4px * 9);
+  width: calc(64px * 10 + 4px * 9);
 }
 
 .element-spacer.small {
-    width: calc(64px * 3 + 4px * 2);
+  width: calc(64px * 3 + 4px * 2);
 }
 
 .spacer {
-    height: 20px;
+  height: 20px;
 }
 
 .lanthanides,
 .actinides {
-    margin-top: 4px;
+  margin-top: 4px;
 }
 
-/* Element Categories */
-.alkali-metal { background-color: #ff6666; }
-.alkaline-earth { background-color: #ffdead; }
-.transition-metal { background-color: #ffc0c0; }
-.post-transition { background-color: #cccccc; }
-.metalloid { background-color: #cccc99; }
-.nonmetal { background-color: #a1ffc3; }
-.halogen { background-color: #ffff99; }
-.noble-gas { background-color: #c0ffff; }
-.lanthanoid { background-color: #ffbfff; }
-.actinoid { background-color: #ff99cc; }
+.alkali-metal {
+  background-color: #ff6666;
+}
+.alkaline-earth {
+  background-color: #ffdead;
+}
+.transition-metal {
+  background-color: #ffc0c0;
+}
+.post-transition {
+  background-color: #cccccc;
+}
+.metalloid {
+  background-color: #cccc99;
+}
+.nonmetal {
+  background-color: #a1ffc3;
+}
+.halogen {
+  background-color: #ffff99;
+}
+.noble-gas {
+  background-color: #c0ffff;
+}
+.lanthanoid {
+  background-color: #ffbfff;
+}
+.actinoid {
+  background-color: #ff99cc;
+}
 
-/* Tooltip Styles */
 .element-tooltip {
-    position: fixed;
-    background: white;
-    padding: 12px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-    min-width: 200px;
-    pointer-events: none;
+  position: fixed;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 1000;
+  min-width: 220px;
+  pointer-events: none;
+  animation: fadeInScale 0.2s ease-out;
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .element-tooltip h3 {
-    margin: 0 0 8px 0;
-    color: #1a1a1a;
+  margin: 0 0 8px 0;
+  color: #0f172a;
+  font-size: 1.1em;
+  font-weight: 700;
 }
 
 .element-tooltip p {
-    margin: 4px 0;
-    color: #4b5563;
+  margin: 4px 0;
+  color: #4b5563;
+  font-size: 0.9em;
 }
 
 .element-tooltip .data-status {
-    margin-top: 8px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.9em;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  font-weight: 600;
 }
 
 .element-tooltip .data-status.has-data {
-    background-color: #dbeafe;
-    color: #1e40af;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
 }
 
 .element-tooltip .data-status.no-data {
-    background-color: #f3f4f6;
-    color: #6b7280;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #6b7280;
 }
 
-/* Legend Styles */
 .category-legend {
-    margin-top: 20px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
-    padding: 16px;
-    background: #f9fafb;
-    border-radius: 8px;
+  margin-top: 40px;
+  width: 100%;
+  max-width: calc(64px * 18 + 4px * 17);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-sizing: border-box;
 }
 
 .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.legend-item:hover {
+  transform: translateX(4px);
 }
 
 .color-box {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    border: 1px solid #e5e7eb;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .category-name {
-    font-size: 0.8em;
-    color: #1f2937;
+  font-size: 0.85em;
+  color: #1f2937;
+  font-weight: 600;
+  text-transform: capitalize;
 }
 
 .data-availability-legend {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 20px;
-    padding-top: 10px;
-    margin-top: 10px;
-    border-top: 1px solid #e5e7eb;
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 24px;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 2px solid rgba(0, 0, 0, 0.1);
+  justify-content: center;
 }
 
 .element-sample {
-    width: 30px;
-    height: 30px;
-    border-radius: 4px;
-    background: white;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: white;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .element-sample.has-data {
-    border: 2px solid #2563eb;
+  border: 2px solid #0369a1;
+  box-shadow: 0 4px 12px rgba(3, 105, 161, 0.2);
 }
 
 .element-sample.no-data {
-    opacity: 0.7;
-    border: 1px solid #ccc;
+  opacity: 0.6;
+  border: 1px solid #cbd5e1;
+  filter: grayscale(0.3);
 }
 
 .data-indicator {
-    position: absolute;
-    top: 2px;
-    right: 4px;
-    color: #2563eb;
-    font-size: 1.2em;
-    font-weight: bold;
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  color: #0369a1;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
 import "./EditData.css";
 import config from "../../config";
+import AuthorsInput from "../Form/AuthorsInput";
 
 const EditData = ({ setUser, isAuthorized, user }) => {
   const location = useLocation();
@@ -202,7 +203,7 @@ const EditData = ({ setUser, isAuthorized, user }) => {
 
   return (
     <>
-      <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user}/>
+      <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
       <div className="edit-data-container">
         <h2>Edit Dataset</h2>
         <form onSubmit={handleSubmit}>
@@ -279,18 +280,6 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                 )}
                 <div className="form-grid">
                   <div className="form-group">
-                    <label>Author</label>
-                    <input
-                      type="text"
-                      value={pub.author}
-                      onChange={(e) => {
-                        const newPubs = [...publications];
-                        newPubs[index] = { ...pub, author: e.target.value };
-                        setPublications(newPubs);
-                      }}
-                    />
-                  </div>
-                  <div className="form-group">
                     <label>Journal</label>
                     <input
                       type="text"
@@ -326,6 +315,18 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                       }}
                     />
                   </div>
+                </div>
+
+                <div className="authors-edit-section">
+                  <h4>Authors</h4>
+                  <AuthorsInput
+                    authors={pub.authors || [pub.author || ""]}
+                    onAuthorsChange={(authors) => {
+                      const newPubs = [...publications];
+                      newPubs[index] = { ...pub, authors };
+                      setPublications(newPubs);
+                    }}
+                  />
                 </div>
 
                 <div className="readings-edit">

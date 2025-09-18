@@ -11,6 +11,10 @@ import requests
 import numpy as np
 from vectorized_combination import run_an_model
 import traceback
+import os
+from werkzeug.utils import secure_filename
+import tempfile
+from script import ASDParameterExtractor
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
@@ -310,13 +314,18 @@ def add_data_to_db(data, submitter):
     publication_data = data.get("publication", {})
     if isinstance(publication_data, str):
         publication_data = {
-            "author": publication_data,
+            "authors": [publication_data],
             "doi": "",
             "journal": "",
             "year": ""
         }
+    authors = publication_data.get("authors", [])
+    if isinstance(authors, str):
+        authors = [authors]
+    elif not authors and publication_data.get("author"):
+        authors = [publication_data.get("author")]
     publication_data = {
-        "author": publication_data.get("author", ""),
+        "authors": authors,
         "journal": publication_data.get("journal", ""),
         "year": publication_data.get("year", ""),
         "doi": publication_data.get("doi", "")
@@ -377,11 +386,27 @@ def add_data_to_db(data, submitter):
         }
         pair_doc["conditions"].append(condition_doc)
         
+    def matches_publication(existing_pub, new_pub_data):
+        existing_authors = existing_pub["publication"].get("authors", [existing_pub["publication"].get("author", "")])
+        new_authors = new_pub_data.get("authors", [])
+        
+        # Convert single author to list format for comparison
+        if isinstance(existing_authors, str):
+            existing_authors = [existing_authors]
+        if isinstance(new_authors, str):
+            new_authors = [new_authors]
+            
+        # Match if first authors are the same and journal/year match
+        first_author_match = (existing_authors and new_authors and 
+                            existing_authors[0] == new_authors[0])
+        journal_match = existing_pub["publication"]["journal"] == new_pub_data["journal"]
+        year_match = existing_pub["publication"]["year"] == new_pub_data["year"]
+        
+        return first_author_match and journal_match and year_match
+
     pub_doc = next(
         (p for p in condition_doc.get("publications", [])
-         if (p["publication"]["author"] == publication_data["author"] and 
-             p["publication"]["journal"] == publication_data["journal"] and
-             p["publication"]["year"] == publication_data["year"])),
+        if matches_publication(p, publication_data)),
         None
     )
     
@@ -448,7 +473,7 @@ def update_data():
             for pub_data in group["publications"]:
                 pub_readings = next(
                     (r["readings"] for r in group["readings"]
-                     if r["publication"]["author"] == pub_data["author"]),
+                    if publication_matches(r["publication"], pub_data)),
                     []
                 )
                 # Find or create target location for this publication
@@ -498,7 +523,7 @@ def update_data():
                 # Add publication to target location
                 existing_pub = next(
                     (p for p in target_condition["publications"]
-                     if p["publication"]["author"] == pub_data["author"]),
+                    if publication_matches(p["publication"], pub_data)),
                     None
                 )
                 if existing_pub:
@@ -558,6 +583,66 @@ def get_materials():
         return jsonify([])
     materials = [m["material"] for m in doc.get("materials", [])]
     return jsonify(materials)
+
+@app.route("/api/extract-pdf-data", methods=["POST"])
+def extract_pdf_data():
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    if 'pdf' not in request.files:
+        return jsonify({"error": "No PDF file provided"}), 400
+    
+    file = request.files['pdf']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"error": "File must be a PDF"}), 400
+    
+    try:
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            file.save(tmp_file.name)
+            
+            # Use your existing script classes directly
+            from script import ASDParameterExtractor
+            
+            # You'll need to set your Gemini API key here
+            GEMINI_API_KEY = Config.GEMINI_API_KEY  # Add this to your config
+            extractor = ASDParameterExtractor(GEMINI_API_KEY)
+            
+            # Use the existing extract_from_pdf method
+            result = extractor.extract_from_pdf(tmp_file.name)
+            
+            # Clean up temporary file
+            os.unlink(tmp_file.name)
+            
+            if result['status'] == 'success':
+                form_data = {
+                    'element': result.get('element', ''),
+                    'material': result.get('deposited_material', ''),
+                    'technique': result.get('deposition_technique', ''),
+                    'precursor': result.get('precursor', ''),
+                    'coreactant': result.get('coreactant', ''),
+                    'surface': result.get('surface_substrate', ''),
+                    'pretreatment': result.get('surface_pretreatment', ''),
+                    'confidence': result.get('confidence', 'low')
+                }
+                
+                return jsonify({
+                    'status': 'success',
+                    'data': form_data,
+                    'confidence': result.get('confidence', 'low')
+                })
+            else:
+                return jsonify({
+                    'status': 'error', 
+                    'error': result.get('error', 'Extraction failed')
+                }), 500
+                
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route("/api/precursors", methods=["GET"])
 def get_precursors_and_coreactants():
@@ -640,9 +725,19 @@ def get_readings():
         temperature = request.args.get('temperature')
         publication = json.loads(request.args.get('publication'))
 
-        match_conditions = {
-            "materials.pre_cor.conditions.publications.publication.author": publication["author"]
-        }
+        match_conditions = {}
+
+        if publication.get("authors"):
+            authors = publication["authors"]
+            if isinstance(authors, list) and authors:
+                match_conditions["materials.pre_cor.conditions.publications.publication.authors"] = {"$in": [authors[0]]}
+            elif isinstance(authors, str):
+                match_conditions["materials.pre_cor.conditions.publications.publication.authors"] = {"$in": [authors]}
+        elif publication.get("author"):
+            match_conditions["$or"] = [
+                {"materials.pre_cor.conditions.publications.publication.author": publication["author"]},
+                {"materials.pre_cor.conditions.publications.publication.authors": {"$in": [publication["author"]]}}
+            ]
         
         if publication.get("journal"):
             match_conditions["materials.pre_cor.conditions.publications.publication.journal"] = publication["journal"]
@@ -835,7 +930,27 @@ def get_element_data_by_surface():
     except Exception as e:
         print(f"Error getting surface data: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+
+def publication_matches(stored_pub, target_pub):
+    """Check if a stored publication matches a target publication"""
+    # Handle both legacy author and new authors format
+    stored_authors = stored_pub.get("authors", [stored_pub.get("author", "")])
+    target_authors = target_pub.get("authors", [target_pub.get("author", "")])
     
+    if isinstance(stored_authors, str):
+        stored_authors = [stored_authors]
+    if isinstance(target_authors, str):
+        target_authors = [target_authors]
+    
+    # Match on first author
+    first_author_match = (stored_authors and target_authors and 
+                         stored_authors[0] == target_authors[0])
+    
+    journal_match = stored_pub.get('journal', '') == target_pub.get('journal', '')
+    year_match = stored_pub.get('year', '') == target_pub.get('year', '')
+    
+    return first_author_match and journal_match and year_match
+
 @app.route("/api/delete-data", methods=["DELETE"])
 def delete_data():
     try:
@@ -889,9 +1004,7 @@ def delete_data():
                                     condition['publications'] = [
                                         pub for pub in condition['publications']
                                         if not any(
-                                            pub['publication']['author'] == p['author'] and
-                                            pub['publication'].get('journal', '') == p.get('journal', '') and
-                                            pub['publication'].get('year', '') == p.get('year', '')
+                                            publication_matches(pub['publication'], p)
                                             for p in publications
                                         )
                                     ]
