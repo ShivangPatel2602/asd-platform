@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../Navbar/Navbar";
 import "./ModelData.css";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -362,25 +362,25 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [originalGrowthData, setOriginalGrowthData] = useState([]);
   const [originalNonGrowthData, setOriginalNonGrowthData] = useState([]);
-
-  // NEW: Store original computation results for reset functionality
   const [originalResults, setOriginalResults] = useState(null);
   const [hasBeenModified, setHasBeenModified] = useState(false);
+  const [returnState, setReturnState] = useState(null);
 
+  const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    // Handle data passed from comparison page
     if (location.state) {
-      const { growthInput, nonGrowthInput, autoCompute } = location.state;
+      const { growthInput, nonGrowthInput, autoCompute, returnTo } =
+        location.state;
 
       if (growthInput && nonGrowthInput) {
         setGrowthInput(growthInput);
         setNonGrowthInput(nonGrowthInput);
-
-        // Auto-compute if requested
+        if (returnTo) {
+          setReturnState(returnTo);
+        }
         if (autoCompute) {
-          // Small delay to ensure state is updated
           setTimeout(() => {
             handlePlot();
           }, 100);
@@ -401,6 +401,14 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
         "Reset complete - back to original scenario:",
         originalResults.best_scenario
       );
+    }
+  };
+
+  const handleReturnToComparison = () => {
+    if (returnState) {
+      navigate(returnState.path, {
+        state: returnState.state,
+      });
     }
   };
 
@@ -597,6 +605,18 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
           >
             {isLoading ? "Processing..." : "Plot Data"}
           </button>
+          {returnState && (
+            <button
+              className="plot-btn"
+              onClick={handleReturnToComparison}
+              style={{
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                marginTop: "12px",
+              }}
+            >
+              ← Return to Comparison
+            </button>
+          )}
 
           {showPlot && Object.keys(scenarioResults).length > 0 && (
             <div className="scenario-results">

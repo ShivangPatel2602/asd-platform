@@ -61,6 +61,18 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     "pretreatment",
   ];
 
+  const getUniqueValues = (data, column) => {
+    const values = new Set();
+    data.forEach((row) => {
+      if (row[column] && row[column].trim()) {
+        values.add(row[column]);
+      }
+    });
+    return Array.from(values).sort();
+  };
+
+  const filteredElementData = elementData;
+
   useEffect(() => {
     setIsLoading(true);
     setError("");
@@ -152,12 +164,59 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     }
   }, [isSurfaceMode, elementData, element]);
 
+  useEffect(() => {
+    if (location.state) {
+      const {
+        selectedPublications: restoredSelections,
+        readings: restoredReadings,
+        showPlots: restoredShowPlots,
+        showChart: restoredShowChart,
+      } = location.state;
+
+      if (restoredSelections && restoredReadings) {
+        console.log("Restoring state from navigation:", {
+          selectedPublications: restoredSelections,
+          readings: restoredReadings,
+          showPlots: restoredShowPlots,
+          showChart: restoredShowChart,
+        });
+
+        setSelectedPublications(restoredSelections);
+        setReadings(restoredReadings);
+        setShowChart(restoredShowChart || false);
+        setShowPlots(restoredShowPlots || false);
+        window.history.replaceState(
+          {},
+          "",
+          location.pathname + location.search
+        );
+      }
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (Object.keys(selectedPublications).length > 0) {
+      const stateToSave = {
+        selectedPublications,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem("comparisonPageState", JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem("comparisonPageState");
+    }
+  }, [selectedPublications]);
   const mergedRows = useMemo(() => {
     return getOptimallyMergedRows(
-      elementData,
+      filteredElementData,
       isSurfaceMode ? surfaceModeColumns : elementModeColumns
     );
-  }, [elementData, isSurfaceMode]);
+  }, [filteredElementData, isSurfaceMode]);
+
+  useEffect(() => {
+    if (elementData.length > 0 && !location.state) {
+      restoreStateFromLocalStorage();
+    }
+  }, [elementData, mergedRows]);
 
   const handlePublicationSelect = (rowKey, publication) => {
     setSelectedPublications((prev) => {
@@ -298,6 +357,33 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
       });
   };
 
+  const restoreStateFromLocalStorage = () => {
+    const savedState = localStorage.getItem("comparisonPageState");
+    if (savedState && elementData.length > 0) {
+      try {
+        const { selectedPublications: saved, timestamp } =
+          JSON.parse(savedState);
+        if (Date.now() - timestamp < 3600000) {
+          setSelectedPublications(saved);
+          Object.entries(saved).forEach(([rowKey, publications]) => {
+            const row = mergedRows.find((r) => getRowKey(r) === rowKey);
+            if (row) {
+              publications.forEach((publication) => {
+                const compositeKey = `${rowKey}-${publication.author}`;
+                fetchDataForRow(row, publication, compositeKey);
+              });
+            }
+          });
+        } else {
+          localStorage.removeItem("comparisonPageState");
+        }
+      } catch (error) {
+        console.error("Error restoring state:", error);
+        localStorage.removeItem("comparisonPageState");
+      }
+    }
+  };
+
   const handleCollapsePlots = () => {
     setShowPlots(false);
   };
@@ -372,73 +458,122 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     return `${authors[0]} et al. (${authors.length} authors)`;
   };
 
-  const PublicationCell = ({ publications, index, onSelect }) => {
+  // const PublicationCell = ({ publications, index, onSelect }) => {
+  //   const currentSelections = selectedPublications[index] || [];
+
+  //   return (
+  //     <div className="publications-list">
+  //       {publications.map((pub, pubIndex) => (
+  //         <div
+  //           key={pubIndex}
+  //           className="publication-entry"
+  //           data-pub-index={pubIndex}
+  //         >
+  //           <span
+  //             className={`publication-tag ${
+  //               currentSelections.some(
+  //                 (p) =>
+  //                   (p.authors?.[0] || p.author) ===
+  //                   (pub.authors?.[0] || pub.author)
+  //               )
+  //                 ? "selected"
+  //                 : ""
+  //             }`}
+  //             onClick={() => onSelect(index, pub)}
+  //             title={pub.authors ? `Authors: ${pub.authors.join(", ")}` : ""}
+  //           >
+  //             <span className="publication-index">{pubIndex + 1}</span>
+  //             {`${formatAuthors(pub.authors || [pub.author])}, ${pub.journal} ${
+  //               pub.year
+  //             }`}
+  //           </span>
+  //         </div>
+  //       ))}
+  //     </div>
+  //   );
+  // };
+
+  // const EnhancedDOICell = ({ publications }) => {
+  //   const hasPublishedDOI = publications.some((pub) => pub.doi);
+
+  //   return (
+  //     <div className={`doi-cell ${hasPublishedDOI ? "has-doi" : "no-doi"}`}>
+  //       <div
+  //         className={`doi-status-indicator ${
+  //           hasPublishedDOI ? "published" : "unpublished"
+  //         }`}
+  //       ></div>
+  //       <div className="doi-tooltip">
+  //         {hasPublishedDOI
+  //           ? "Published Research Available"
+  //           : "Unpublished Research Data"}
+  //       </div>
+  //       <div className="doi-list">
+  //         {publications.map((pub, pubIndex) => (
+  //           <div key={pubIndex} className="doi-entry">
+  //             <span className="doi-wrapper">
+  //               <span className="doi-index">{pubIndex + 1}.</span>
+  //               {pub.doi ? (
+  //                 <span
+  //                   className="doi-link"
+  //                   onClick={(e) => {
+  //                     e.stopPropagation();
+  //                     handleDOIClick(pub.doi);
+  //                   }}
+  //                 >
+  //                   {`${pub.author}, ${pub.journal} ${pub.year}`}
+  //                 </span>
+  //               ) : (
+  //                 <span className="doi-not-available">Unpublished</span>
+  //               )}
+  //             </span>
+  //           </div>
+  //         ))}
+  //       </div>
+  //     </div>
+  //   );
+  // };
+
+  const CombinedPublicationDOICell = ({ publications, index, onSelect }) => {
     const currentSelections = selectedPublications[index] || [];
 
     return (
-      <div className="publications-list">
-        {publications.map((pub, pubIndex) => (
-          <div
-            key={pubIndex}
-            className="publication-entry"
-            data-pub-index={pubIndex}
-          >
-            <span
-              className={`publication-tag ${
-                currentSelections.some(
-                  (p) =>
-                    (p.authors?.[0] || p.author) ===
-                    (pub.authors?.[0] || pub.author)
-                )
-                  ? "selected"
-                  : ""
-              }`}
-              onClick={() => onSelect(index, pub)}
-              title={pub.authors ? `Authors: ${pub.authors.join(", ")}` : ""}
-            >
-              <span className="publication-index">{pubIndex + 1}</span>
-              {`${formatAuthors(pub.authors || [pub.author])}, ${pub.journal} ${
-                pub.year
-              }`}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const EnhancedDOICell = ({ publications }) => {
-    const hasPublishedDOI = publications.some((pub) => pub.doi);
-
-    return (
-      <div className={`doi-cell ${hasPublishedDOI ? "has-doi" : "no-doi"}`}>
-        <div
-          className={`doi-status-indicator ${
-            hasPublishedDOI ? "published" : "unpublished"
-          }`}
-        ></div>
-        <div className="doi-tooltip">
-          {hasPublishedDOI
-            ? "Published Research Available"
-            : "Unpublished Research Data"}
-        </div>
-        <div className="doi-list">
+      <div className="combined-pub-doi-cell">
+        <div className="publications-list">
           {publications.map((pub, pubIndex) => (
-            <div key={pubIndex} className="doi-entry">
-              <span className="doi-wrapper">
-                <span className="doi-index">{pubIndex + 1}.</span>
-                {pub.doi ? (
-                  <span
-                    className="doi-link"
+            <div
+              key={pubIndex}
+              className="publication-entry"
+              data-pub-index={pubIndex}
+            >
+              <span
+                className={`publication-tag ${
+                  currentSelections.some(
+                    (p) =>
+                      (p.authors?.[0] || p.author) ===
+                      (pub.authors?.[0] || pub.author)
+                  )
+                    ? "selected"
+                    : ""
+                }`}
+                onClick={() => onSelect(index, pub)}
+                title={pub.authors ? `Authors: ${pub.authors.join(", ")}` : ""}
+              >
+                <span className="publication-index">{pubIndex + 1}</span>
+                {`${formatAuthors(pub.authors || [pub.author])}, ${
+                  pub.journal
+                } ${pub.year}`}
+                {pub.doi && (
+                  <button
+                    className="doi-icon-button"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDOIClick(pub.doi);
                     }}
+                    title="Open DOI link"
                   >
-                    {`${pub.author}, ${pub.journal} ${pub.year}`}
-                  </span>
-                ) : (
-                  <span className="doi-not-available">Unpublished</span>
+                    🔗
+                  </button>
                 )}
               </span>
             </div>
@@ -505,6 +640,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     setReadings({});
     setShowChart(false);
     setShowPlots(false);
+    localStorage.removeItem("comparisonPageState");
   };
 
   const calculateAxisRanges = () => {
@@ -682,26 +818,31 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   };
 
   const handleModelDataRedirect = () => {
-    // Extract data from the two selected readings
     const readingsArray = Object.values(readings);
     if (readingsArray.length !== 2) return;
 
     const [data1, data2] = readingsArray;
-
-    // Format data for model input
     const growthData = data1
       .map((reading) => `${reading.cycles} ${reading.thickness}`)
       .join("\n");
     const nonGrowthData = data2
       .map((reading) => `${reading.cycles} ${reading.thickness}`)
       .join("\n");
-
-    // Navigate to model-data page with the data
+    const selectionState = {
+      selectedPublications,
+      readings,
+      showPlots: true,
+      showChart: true,
+    };
     navigate("/model-data", {
       state: {
         growthInput: growthData,
         nonGrowthInput: nonGrowthData,
         autoCompute: true,
+        returnTo: {
+          path: location.pathname + location.search,
+          state: selectionState,
+        },
       },
     });
   };
@@ -829,8 +970,8 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
               <div className={`table-section ${showPlots ? "with-plots" : ""}`}>
                 <div className="table-container">
                   <TableControls
-                    totalRows={mergedRows.length}
-                    currentRows={mergedRows.length}
+                    totalRows={elementData.length}
+                    currentRows={filteredElementData.length}
                     onJumpToRow={handleJumpToRow}
                   />
                   <table className={isSurfaceMode ? "surface-mode-table" : ""}>
@@ -842,9 +983,8 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                             <th>Material</th>
                             <th>Technique</th>
                             <th>Precursor</th>
-                            <th>Co-reactant</th>
+                            <th>Coreactant</th>
                             <th>Pretreatment</th>
-                            <th>Dataset</th>
                             <th>Source</th>
                             <th>Edit</th>
                           </>
@@ -853,10 +993,9 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                             <th>Material</th>
                             <th>Technique</th>
                             <th>Precursor</th>
-                            <th>Co-reactant</th>
+                            <th>Coreactant</th>
                             <th>Pretreatment</th>
                             <th>Surface</th>
-                            <th>Dataset</th>
                             <th>Source</th>
                             <th>Edit</th>
                           </>
@@ -936,15 +1075,10 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                               </>
                             )}
                             <td>
-                              <PublicationCell
+                              <CombinedPublicationDOICell
                                 publications={row.publications}
                                 index={rowKey}
                                 onSelect={handlePublicationSelect}
-                              />
-                            </td>
-                            <td>
-                              <EnhancedDOICell
-                                publications={row.publications}
                               />
                             </td>
                             <td>{renderActionButtons(row)}</td>
