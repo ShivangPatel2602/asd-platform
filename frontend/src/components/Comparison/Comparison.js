@@ -31,6 +31,9 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     publications: null,
   });
   const [showPlots, setShowPlots] = useState(false);
+  const [columnFilters, setColumnFilters] = useState({});
+  const [activeFilterColumn, setActiveFilterColumn] = useState(null);
+  const filterDropdownRef = useRef(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -71,7 +74,18 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     return Array.from(values).sort();
   };
 
-  const filteredElementData = elementData;
+  const filteredElementData = useMemo(() => {
+    if (Object.keys(columnFilters).length === 0) {
+      return elementData;
+    }
+
+    return elementData.filter((row) => {
+      return Object.entries(columnFilters).every(([column, selectedValues]) => {
+        if (selectedValues.length === 0) return true;
+        return selectedValues.includes(row[column]);
+      });
+    });
+  }, [elementData, columnFilters]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -287,6 +301,33 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
       row.temperature,
     ].join("|");
   }
+
+  const handleFilterChange = (column, value) => {
+    setColumnFilters((prev) => {
+      const currentFilters = prev[column] || [];
+      const newFilters = currentFilters.includes(value)
+        ? currentFilters.filter((v) => v !== value)
+        : [...currentFilters, value];
+
+      if (newFilters.length === 0) {
+        const { [column]: _, ...rest } = prev;
+        return rest;
+      }
+
+      return { ...prev, [column]: newFilters };
+    });
+  };
+
+  const clearColumnFilter = (column) => {
+    setColumnFilters((prev) => {
+      const { [column]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setColumnFilters({});
+  };
 
   function renderChemicalFormula(formula) {
     return formula.split(/(\s+)/).map((word, i) => {
@@ -929,6 +970,99 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     }
   };
 
+  const FilterableHeader = ({ column, label }) => {
+    const uniqueValues = getUniqueValues(elementData, column);
+    const filterCount = columnFilters[column]?.length || 0;
+    const headerRef = useRef(null);
+    const dropdownRef = useRef(null);
+
+    const handleToggleFilter = (e) => {
+      e.stopPropagation();
+      if (activeFilterColumn === column) {
+        setActiveFilterColumn(null);
+      } else {
+        setActiveFilterColumn(column);
+      }
+    };
+
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (
+          activeFilterColumn === column &&
+          dropdownRef.current &&
+          headerRef.current &&
+          !dropdownRef.current.contains(event.target) &&
+          !headerRef.current.contains(event.target)
+        ) {
+          setActiveFilterColumn(null);
+        }
+      };
+
+      if (activeFilterColumn === column) {
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+          document.removeEventListener("mousedown", handleClickOutside);
+      }
+    }, [activeFilterColumn, column]);
+
+    return (
+      <th className="filterable-header" ref={headerRef}>
+        <div className="header-content">
+          <span>{label}</span>
+          <button
+            className={`filter-toggle ${
+              activeFilterColumn === column ? "active" : ""
+            } ${filterCount > 0 ? "has-filters" : ""}`}
+            onClick={handleToggleFilter}
+          >
+            {filterCount > 0 ? `${filterCount}` : "▼"}
+          </button>
+        </div>
+        {activeFilterColumn === column && (
+          <div ref={dropdownRef} className="filter-dropdown-content">
+            <div className="filter-header">
+              <span>Filter {label}</span>
+              {filterCount > 0 && (
+                <button
+                  className="clear-column-filter"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearColumnFilter(column);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="filter-options-scroll">
+              <div className="filter-options">
+                {uniqueValues.map((value) => (
+                  <label key={value} className="filter-option">
+                    <input
+                      type="checkbox"
+                      checked={columnFilters[column]?.includes(value) || false}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleFilterChange(column, value);
+                      }}
+                    />
+                    <span className="filter-value">{value}</span>
+                    <span className="filter-count">
+                      {
+                        elementData.filter((row) => row[column] === value)
+                          .length
+                      }
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </th>
+    );
+  };
+
   return (
     <>
       <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
@@ -974,28 +1108,72 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                     currentRows={filteredElementData.length}
                     onJumpToRow={handleJumpToRow}
                   />
+                  {Object.keys(columnFilters).length > 0 && (
+                    <button
+                      className="clear-all-filters-btn"
+                      onClick={clearAllFilters}
+                    >
+                      Clear All Filters ({Object.keys(columnFilters).length})
+                    </button>
+                  )}
                   <table className={isSurfaceMode ? "surface-mode-table" : ""}>
                     <thead>
                       <tr>
                         {isSurfaceMode ? (
                           <>
-                            <th>Surface</th>
-                            <th>Material</th>
-                            <th>Technique</th>
-                            <th>Precursor</th>
-                            <th>Coreactant</th>
-                            <th>Pretreatment</th>
+                            <FilterableHeader
+                              column="surface"
+                              label="Surface"
+                            />
+                            <FilterableHeader
+                              column="material"
+                              label="Material"
+                            />
+                            <FilterableHeader
+                              column="technique"
+                              label="Technique"
+                            />
+                            <FilterableHeader
+                              column="precursor"
+                              label="Precursor"
+                            />
+                            <FilterableHeader
+                              column="coreactant"
+                              label="Coreactant"
+                            />
+                            <FilterableHeader
+                              column="pretreatment"
+                              label="Pretreatment"
+                            />
                             <th>Source</th>
                             <th>Edit</th>
                           </>
                         ) : (
                           <>
-                            <th>Material</th>
-                            <th>Technique</th>
-                            <th>Precursor</th>
-                            <th>Coreactant</th>
-                            <th>Pretreatment</th>
-                            <th>Surface</th>
+                            <FilterableHeader
+                              column="material"
+                              label="Material"
+                            />
+                            <FilterableHeader
+                              column="technique"
+                              label="Technique"
+                            />
+                            <FilterableHeader
+                              column="precursor"
+                              label="Precursor"
+                            />
+                            <FilterableHeader
+                              column="coreactant"
+                              label="Coreactant"
+                            />
+                            <FilterableHeader
+                              column="pretreatment"
+                              label="Pretreatment"
+                            />
+                            <FilterableHeader
+                              column="surface"
+                              label="Surface"
+                            />
                             <th>Source</th>
                             <th>Edit</th>
                           </>
