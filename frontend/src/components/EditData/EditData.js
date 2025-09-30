@@ -13,9 +13,9 @@ const EditData = ({ setUser, isAuthorized, user }) => {
   const [publications, setPublications] = useState([]);
   const [readings, setReadings] = useState([]);
   const [status, setStatus] = useState("");
-  const [cursorPositions, setCursorPositions] = useState({});
   const [textareaContent, setTextareaContent] = useState({});
   const [publicationFields, setPublicationFields] = useState([]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (!rowData) {
@@ -80,13 +80,13 @@ const EditData = ({ setUser, isAuthorized, user }) => {
     return text.split("\n").map((line) => {
       const [cycles, thickness] = line.split(/\s+/);
       return {
-        cycles: cycles === "0" ? 0 : cycles || "",
-        thickness: thickness === "0" ? 0 : thickness || "",
+        cycles: cycles === "0" ? 0 : parseFloat(cycles) || "",
+        thickness: thickness === "0" ? 0 : parseFloat(thickness) || "",
       };
     });
   };
 
-  const handleReadingsChange = (index, value, cursorStart, cursorEnd) => {
+  const handleReadingsChange = (index, value) => {
     setTextareaContent((prev) => ({
       ...prev,
       [index]: value,
@@ -102,15 +102,10 @@ const EditData = ({ setUser, isAuthorized, user }) => {
       };
       return newReadings;
     });
-
-    setCursorPositions((prev) => ({
-      ...prev,
-      [index]: { start: cursorStart, end: cursorEnd },
-    }));
   };
 
   useEffect(() => {
-    if (readings.length > 0) {
+    if (readings.length > 0 && isInitialLoad) {
       const content = {};
       readings.forEach((reading, index) => {
         content[index] =
@@ -119,8 +114,9 @@ const EditData = ({ setUser, isAuthorized, user }) => {
             ?.join("\n") || "";
       });
       setTextareaContent(content);
+      setIsInitialLoad(false);
     }
-  }, [readings]);
+  }, [readings, isInitialLoad]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -334,46 +330,35 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                   <textarea
                     value={textareaContent[index] || ""}
                     onChange={(e) => {
-                      const cursorStart = e.target.selectionStart;
-                      const cursorEnd = e.target.selectionEnd;
-                      handleReadingsChange(
-                        index,
-                        e.target.value,
-                        cursorStart,
-                        cursorEnd
+                      const sanitized = e.target.value.replace(
+                        /[^0-9.\s\n]/g,
+                        ""
                       );
+                      handleReadingsChange(index, sanitized);
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") return;
+                    // onKeyDown={(e) => {
+                    //   if (e.key === "Enter") return;
 
-                      const allowedKeys = [
-                        "Backspace",
-                        "Delete",
-                        "ArrowLeft",
-                        "ArrowRight",
-                        "ArrowUp",
-                        "ArrowDown",
-                        "Tab",
-                        " ",
-                        ".",
-                      ];
-                      const isNumber = /^[0-9]$/;
+                    //   const allowedKeys = [
+                    //     "Backspace",
+                    //     "Delete",
+                    //     "ArrowLeft",
+                    //     "ArrowRight",
+                    //     "ArrowUp",
+                    //     "ArrowDown",
+                    //     "Tab",
+                    //     " ",
+                    //     ".",
+                    //   ];
+                    //   const isNumber = /^[0-9]$/;
 
-                      if (
-                        !isNumber.test(e.key) &&
-                        !allowedKeys.includes(e.key)
-                      ) {
-                        e.preventDefault();
-                      }
-                    }}
-                    ref={(element) => {
-                      if (element && cursorPositions[index]) {
-                        element.setSelectionRange(
-                          cursorPositions[index].start,
-                          cursorPositions[index].end
-                        );
-                      }
-                    }}
+                    //   if (
+                    //     !isNumber.test(e.key) &&
+                    //     !allowedKeys.includes(e.key)
+                    //   ) {
+                    //     e.preventDefault();
+                    //   }
+                    // }}
                     rows={10}
                     placeholder="Format: cycle thickness&#10;Example:&#10;0 0&#10;10 0.5"
                   />

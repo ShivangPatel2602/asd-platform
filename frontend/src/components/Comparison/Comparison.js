@@ -385,9 +385,14 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         return res.json();
       })
       .then((data) => {
+        const normalizedData = data.map((reading) => ({
+          ...reading,
+          cycles: Number(reading.cycles),
+          thickness: Number(reading.thickness),
+        }));
         setReadings((prev) => ({
           ...prev,
-          [compositeKey]: data,
+          [compositeKey]: normalizedData,
         }));
         setShowChart(true);
         setShowPlots(true);
@@ -1362,7 +1367,8 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                           <Tooltip
                             formatter={(value, name) => {
                               const [index, author] = name.split("-");
-                              return [`${value.toFixed(2)} nm`, author];
+                              const numValue = Number(value);
+                              return [`${numValue.toFixed(2)} nm`, author];
                             }}
                             labelFormatter={(value) => `Cycles: ${value}`}
                           />
