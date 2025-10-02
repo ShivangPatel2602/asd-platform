@@ -121,15 +121,20 @@ const EditData = ({ setUser, isAuthorized, user }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Build a list of all publications with their intended parent fields
-      const allPubs = publications.map((pub, index) => ({
-        ...pub,
+      const allPubs = publications.map((pub, index) => {
+      const { author, ...cleanPub } = pub;
+      if (!cleanPub.authors || cleanPub.authors.length === 0) {
+        cleanPub.authors = author ? [author] : [];
+      }
+      
+      return {
+        ...cleanPub,
         parentFields: publicationFields[index].hasCustomFields
           ? publicationFields[index]
           : formData,
-      }));
+      };
+    });
 
-      // Group by parentFields
       const groups = {};
       allPubs.forEach((pub, idx) => {
         const key = [
@@ -319,7 +324,11 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                     authors={pub.authors || [pub.author || ""]}
                     onAuthorsChange={(authors) => {
                       const newPubs = [...publications];
-                      newPubs[index] = { ...pub, authors };
+                      const { author, ...pubWithoutAuthor } = newPubs[index];
+                      newPubs[index] = {
+                        ...pubWithoutAuthor,
+                        authors,
+                      };
                       setPublications(newPubs);
                     }}
                   />

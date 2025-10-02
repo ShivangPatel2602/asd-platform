@@ -16,6 +16,7 @@ import DashboardLandingPage from "./components/DashboardLandingPage/DashboardLan
 import FilterPage from "./components/FilterPage/FilterPage";
 import PeriodicTableSelection from "./components/PeriodicTableSelection/PeriodicTableSelection";
 import ModelData from "./components/ModelData/ModelData";
+import AdminCleanup from "./components/Cleanup/AdminCleanup";
 import "./App.css";
 
 function App() {
@@ -81,6 +82,16 @@ function App() {
             ) : (
               <Navigate to="/" replace />
             )
+          }
+        />
+        <Route
+          path="/admin-cleanup"
+          element={
+            <AdminCleanup
+              setUser={setUser}
+              isAuthorized={isAuthorized}
+              user={user}
+            />
           }
         />
         <Route

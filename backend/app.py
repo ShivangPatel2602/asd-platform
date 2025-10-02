@@ -471,6 +471,21 @@ def update_data():
         # Step 2: Add publications to their new locations
         for group in updated_groups:
             for pub_data in group["publications"]:
+                normalized_pub = {
+                    "journal": pub_data.get("journal", ""),
+                    "year": pub_data.get("year", ""),
+                    "doi": pub_data.get("doi", ""),
+                    "authors": pub_data.get("authors", [])
+                }
+                
+                # Fallback: if authors is empty but author exists, migrate it
+                if not normalized_pub["authors"] and pub_data.get("author"):
+                    normalized_pub["authors"] = [pub_data["author"]]
+                
+                # Ensure authors is always an array
+                if isinstance(normalized_pub["authors"], str):
+                    normalized_pub["authors"] = [normalized_pub["authors"]]
+
                 pub_readings = next(
                     (r["readings"] for r in group["readings"]
                     if publication_matches(r["publication"], pub_data)),
@@ -523,15 +538,15 @@ def update_data():
                 # Add publication to target location
                 existing_pub = next(
                     (p for p in target_condition["publications"]
-                    if publication_matches(p["publication"], pub_data)),
+                    if publication_matches(p["publication"], normalized_pub)),
                     None
                 )
                 if existing_pub:
-                    existing_pub["publication"] = pub_data
+                    existing_pub["publication"] = normalized_pub
                     existing_pub["readings"] = pub_readings
                 else:
                     target_condition["publications"].append({
-                        "publication": pub_data,
+                        "publication": normalized_pub,
                         "readings": pub_readings,
                         "submittedBy": {
                             "email": user.get("email"),
@@ -574,6 +589,58 @@ def notify_authorized_users(data, submitter):
             <p>Please review the submission on the platform.</p>
         """
         mail.send(notify_msg)
+
+@app.route("/api/cleanup-author-field", methods=["POST"])
+def cleanup_author_field():
+    """Remove old 'author' field and keep only 'authors' array"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    is_authorized = authorized_users.find_one({"emails": {"$in": [user.get("email")]}})
+    if not is_authorized:
+        return jsonify({"error": "Not authorized"}), 403
+    
+    try:
+        updated_count = 0
+        
+        all_docs = list(collection.find())
+        
+        for doc in all_docs:
+            modified = False
+            
+            for material in doc.get("materials", []):
+                for pair in material.get("pre_cor", []):
+                    for condition in pair.get("conditions", []):
+                        for pub in condition.get("publications", []):
+                            publication = pub.get("publication", {})
+                            
+                            # If it has both 'author' and 'authors', remove 'author'
+                            if "author" in publication:
+                                if "authors" not in publication:
+                                    # Migrate author to authors
+                                    publication["authors"] = [publication["author"]]
+                                # Remove the old author field
+                                del publication["author"]
+                                modified = True
+                            
+                            # Ensure authors is always an array
+                            if "authors" in publication and isinstance(publication["authors"], str):
+                                publication["authors"] = [publication["authors"]]
+                                modified = True
+            
+            if modified:
+                collection.replace_one({"_id": doc["_id"]}, doc)
+                updated_count += 1
+        
+        return jsonify({
+            "message": f"Successfully cleaned up {updated_count} documents",
+            "total_checked": len(all_docs)
+        }), 200
+        
+    except Exception as e:
+        print(f"Cleanup error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
         
 @app.route("/api/materials", methods=["GET"])
 def get_materials():

@@ -235,11 +235,14 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const handlePublicationSelect = (rowKey, publication) => {
     setSelectedPublications((prev) => {
       const currentRowSelections = prev[rowKey] || [];
-      const isAlreadySelected = currentRowSelections.some(
-        (pub) => pub.author === publication.author
-      );
+      const authorName =
+        publication.authors?.[0] || publication.author || "Unknown";
+      const isAlreadySelected = currentRowSelections.some((pub) => {
+        const pubAuthorName = pub.authors?.[0] || pub.author || "Unknown";
+        return pubAuthorName === authorName;
+      });
 
-      const compositeKey = `${rowKey}-${publication.author}`;
+      const compositeKey = `${rowKey}-${authorName}`;
 
       if (isAlreadySelected) {
         const updatedRowSelections = currentRowSelections.filter(
@@ -763,9 +766,10 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
         const row = mergedRows.find((r) => getRowKey(r) === rowKey);
         if (!row) return null;
 
-        const publication = row.publications.find(
-          (pub) => pub.author === authorName
-        );
+        const publication = row.publications.find((pub) => {
+          const pubAuthorName = pub.authors?.[0] || pub.author || "Unknown";
+          return pubAuthorName === authorName;
+        });
         if (!publication) return null;
 
         const displayName = `${row.surface} (${publication.author}${
