@@ -15,6 +15,7 @@ import os
 from werkzeug.utils import secure_filename
 import tempfile
 from script import ASDParameterExtractor
+import google.generativeai as genai
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_dev_key'
@@ -641,6 +642,63 @@ def cleanup_author_field():
     except Exception as e:
         print(f"Cleanup error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/extract-filter-params", methods=["POST"])
+def extract_filter_params():
+    """Extract filter parameters from natural language query using Gemini"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        data = request.get_json()
+        query = data.get('query', '')
+        
+        if not query:
+            return jsonify({"error": "Query is required"}), 400
+        
+        genai.configure(api_key=Config.GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        prompt = f"""Extract ASD filter parameters from this natural language query.
+
+Query: "{query}"
+
+Available parameters to extract:
+- material: The deposited material (e.g., SiO2, TiO2, Al2O3, ZnO)
+- surface: The substrate/surface (e.g., Si, SiO2, glass, metal)
+- technique: Deposition technique (e.g., ALD, CVD, PECVD, MLD)
+- precursor: Precursor compound used
+- coreactant: Reactive species (e.g., H2O, O2, NH3)
+- pretreatment: Surface treatment (e.g., Dilute HF, O2 plasma, UV-Ozone)
+
+Return ONLY a JSON object with extracted parameters. If a parameter is not mentioned, omit it from the response.
+
+Example input: "Show me SiO2 material deposited on Dilute HF surface"
+Example output: {{"material": "SiO2", "pretreatment": "Dilute HF"}}
+
+JSON response:"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        import re
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if json_match:
+            parameters = json.loads(json_match.group())
+            return jsonify({
+                "status": "success",
+                "parameters": parameters,
+                "original_query": query
+            })
+        else:
+            raise ValueError("No valid JSON in response")
+            
+    except Exception as e:
+        print(f"Error extracting parameters: {str(e)}")
+        return jsonify({
+            "error": f"Failed to extract parameters: {str(e)}"
+        }), 500
         
 @app.route("/api/materials", methods=["GET"])
 def get_materials():

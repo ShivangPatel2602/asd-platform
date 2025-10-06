@@ -8,11 +8,14 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
   const [materials, setMaterials] = useState([]);
   const [surfaces, setSurfaces] = useState([]);
   const [techniques, setTechniques] = useState([]);
+  const [naturalQuery, setNaturalQuery] = useState("");
+  const [isProcessingQuery, setIsProcessingQuery] = useState(false);
+  const [extractedParams, setExtractedParams] = useState(null);
+  const [queryError, setQueryError] = useState("");
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Read initial filter values from URL
   const params = new URLSearchParams(location.search);
   const [selectedMaterial, setSelectedMaterial] = useState(
     params.get("material") || ""
@@ -25,7 +28,6 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
   );
   const [loading, setLoading] = useState(false);
 
-  // Fetch all options on mount
   useEffect(() => {
     fetch(`${config.BACKEND_API_URL}/api/all-filters`)
       .then((res) => res.json())
@@ -88,11 +90,139 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
     setSelectedTechnique("");
   };
 
+  const handleNaturalQuerySubmit = async (e) => {
+    e.preventDefault();
+    if (!naturalQuery.trim()) {
+      setQueryError("Please enter a query");
+      return;
+    }
+
+    setIsProcessingQuery(true);
+    setQueryError("");
+    setExtractedParams(null);
+
+    try {
+      const response = await fetch(
+        `${config.BACKEND_API_URL}/api/extract-filter-params`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ query: naturalQuery }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to process query");
+      }
+
+      const data = await response.json();
+      setExtractedParams(data.parameters);
+    } catch (error) {
+      console.error("Error processing query:", error);
+      setQueryError("Failed to process your query. Please try again.");
+    } finally {
+      setIsProcessingQuery(false);
+    }
+  };
+
+  const handleApplyExtractedParams = () => {
+    const params = extractedParams;
+    const queryParams = [];
+    if (params.material)
+      queryParams.push(`material=${encodeURIComponent(params.material)}`);
+    if (params.surface)
+      queryParams.push(`surface=${encodeURIComponent(params.surface)}`);
+    if (params.technique)
+      queryParams.push(`technique=${encodeURIComponent(params.technique)}`);
+
+    const queryString = queryParams.length ? `?${queryParams.join("&")}` : "";
+    navigate(`/comparison${queryString}`);
+  };
+
+  const handleClearExtracted = () => {
+    setExtractedParams(null);
+    setNaturalQuery("");
+    setQueryError("");
+  };
+
   return (
     <>
       <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
       <div className="filter-page-container">
         <h1>Filter Data</h1>
+        <div className="natural-query-section">
+          <h2>Natural Language Query</h2>
+          <p>
+            Ask in plain English, e.g., "Show me SiO2 material deposited on
+            Dilute HF surface"
+          </p>
+
+          <form
+            onSubmit={handleNaturalQuerySubmit}
+            className="natural-query-form"
+          >
+            <div className="query-input-wrapper">
+              <textarea
+                value={naturalQuery}
+                onChange={(e) => setNaturalQuery(e.target.value)}
+                placeholder="Type your query here..."
+                className="natural-query-input"
+                rows="3"
+                disabled={isProcessingQuery}
+              />
+              <button
+                type="submit"
+                className="query-submit-btn"
+                disabled={isProcessingQuery || !naturalQuery.trim()}
+              >
+                {isProcessingQuery ? "Processing..." : "Process Query"}
+              </button>
+            </div>
+          </form>
+
+          {queryError && <div className="query-error">{queryError}</div>}
+
+          {extractedParams && (
+            <div className="extracted-params-display">
+              <div className="extracted-header">
+                <h3>Extracted Parameters</h3>
+                <button
+                  onClick={handleClearExtracted}
+                  className="clear-extracted-btn"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="params-grid">
+                {Object.entries(extractedParams).map(([key, value]) => (
+                  <div key={key} className="param-item">
+                    <span className="param-label">
+                      {key.charAt(0).toUpperCase() + key.slice(1)}:
+                    </span>
+                    <span className="param-value">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="extracted-actions">
+                <button
+                  onClick={handleApplyExtractedParams}
+                  className="apply-params-btn"
+                >
+                  View Results
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="divider">
+          <span>OR</span>
+        </div>
+
+        <h2>Manual Filter Selection</h2>
         <form className="filter-dropdowns" onSubmit={handleSubmit}>
           <div className="filter-group">
             <label>Material</label>

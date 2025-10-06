@@ -996,26 +996,33 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
     useEffect(() => {
       const handleClickOutside = (event) => {
-        if (
-          activeFilterColumn === column &&
-          dropdownRef.current &&
-          headerRef.current &&
-          !dropdownRef.current.contains(event.target) &&
-          !headerRef.current.contains(event.target)
-        ) {
-          setActiveFilterColumn(null);
+        if (activeFilterColumn === column) {
+          const clickedInsideHeader = headerRef.current?.contains(event.target);
+          const clickedInsideDropdown = dropdownRef.current?.contains(
+            event.target
+          );
+
+          if (!clickedInsideHeader && !clickedInsideDropdown) {
+            setActiveFilterColumn(null);
+          }
         }
       };
 
       if (activeFilterColumn === column) {
-        document.addEventListener("mousedown", handleClickOutside);
+        // Use 'click' instead of 'mousedown'
+        document.addEventListener("click", handleClickOutside, true);
+
         return () =>
-          document.removeEventListener("mousedown", handleClickOutside);
+          document.removeEventListener("click", handleClickOutside, true);
       }
     }, [activeFilterColumn, column]);
 
     return (
-      <th className="filterable-header" ref={headerRef}>
+      <th
+        className="filterable-header"
+        ref={headerRef}
+        style={{ zIndex: activeFilterColumn === column ? 102 : 100 }}
+      >
         <div className="header-content">
           <span>{label}</span>
           <button
@@ -1028,7 +1035,11 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           </button>
         </div>
         {activeFilterColumn === column && (
-          <div ref={dropdownRef} className="filter-dropdown-content">
+          <div
+            ref={dropdownRef}
+            className="filter-dropdown-content"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="filter-header">
               <span>Filter {label}</span>
               {filterCount > 0 && (
