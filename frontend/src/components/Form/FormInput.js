@@ -17,8 +17,13 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
     temperature: "",
     publication: {
       authors: [""],
+      title: "",
       journal: "",
+      journal_full: "",
       year: "",
+      volume: "",
+      issue: "",
+      pages: "",
       doi: "",
     },
   });
@@ -61,10 +66,22 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
       title: "Publication Details",
       fields: [
         {
+          id: "publication.title",
+          label: "Paper Title",
+          icon: "📄",
+          placeholder: "e.g., Area-Selective Atomic Layer Deposition...",
+        },
+        {
           id: "publication.journal",
           label: "Journal Abbreviation",
           icon: "📰",
           placeholder: "e.g., ACS Nano",
+        },
+        {
+          id: "publication.journal_full",
+          label: "Full Journal Name",
+          icon: "📚",
+          placeholder: "e.g., ACS Nano - American Chemical Society",
         },
         {
           id: "publication.year",
@@ -72,6 +89,24 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
           icon: "📅",
           type: "number",
           placeholder: "e.g., 2023",
+        },
+        {
+          id: "publication.volume",
+          label: "Volume",
+          icon: "📖",
+          placeholder: "e.g., 15",
+        },
+        {
+          id: "publication.issue",
+          label: "Issue",
+          icon: "🔢",
+          placeholder: "e.g., 3",
+        },
+        {
+          id: "publication.pages",
+          label: "Page Numbers",
+          icon: "📃",
+          placeholder: "e.g., 1234-1245",
         },
         {
           id: "publication.doi",
@@ -91,9 +126,24 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
       technique: extractedData.technique || prev.technique,
       precursor: extractedData.precursor || prev.precursor,
       coreactant: extractedData.coreactant || prev.coreactant,
+      publication: {
+        ...prev.publication,
+        title: extractedData.title || prev.publication.title,
+        journal: extractedData.journal || prev.publication.journal,
+        journal_full:
+          extractedData.journal_full || prev.publication.journal_full,
+        year: extractedData.year || prev.publication.year,
+        volume: extractedData.volume || prev.publication.volume,
+        issue: extractedData.issue || prev.publication.issue,
+        pages: extractedData.pages || prev.publication.pages,
+        doi: extractedData.doi || prev.publication.doi,
+        authors:
+          extractedData.authors && extractedData.authors.length > 0
+            ? extractedData.authors
+            : prev.publication.authors,
+      },
     }));
 
-    // Update surfaces if data is available
     if (extractedData.surface || extractedData.pretreatment) {
       setSurfaces([
         {
@@ -156,10 +206,11 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
     if (
       !form.publication.authors.some((author) => author.trim()) ||
       !form.publication.journal ||
-      !form.publication.year
+      !form.publication.year ||
+      !form.publication.title
     ) {
       setStatus(
-        "Please fill in at least one author and all other publication details"
+        "Please fill in at least: one author, title, journal, and year"
       );
       return;
     }
@@ -207,9 +258,14 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
         coreactant: "",
         temperature: "",
         publication: {
-          author: "",
+          authors: [""],
+          title: "",
           journal: "",
+          journal_full: "",
           year: "",
+          volume: "",
+          issue: "",
+          pages: "",
           doi: "",
         },
       });
@@ -243,112 +299,59 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
               </div>
             )}
 
-            {/* First row: Material Information + Process Parameters */}
+            {/* First row: Material Information + Process Parameters - NOW DYNAMIC */}
             <div className="form-sections-row">
-              <div className="form-section">
-                <h2 className="section-title">Material Information</h2>
-                <div className="section-fields">
-                  <div className="field-container">
-                    <span className="field-icon">⚛️</span>
-                    <LabeledInput
-                      id="element"
-                      label="Element"
-                      value={form.element}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="field-container">
-                    <span className="field-icon">🧪</span>
-                    <LabeledInput
-                      id="material"
-                      label="Material"
-                      value={form.material}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="field-container">
-                    <span className="field-icon">🔧</span>
-                    <LabeledInput
-                      id="technique"
-                      label="Technique of Deposition"
-                      value={form.technique}
-                      onChange={handleChange}
-                    />
+              {sections.slice(0, 2).map((section, sectionIndex) => (
+                <div key={sectionIndex} className="form-section">
+                  <h2 className="section-title">{section.title}</h2>
+                  <div className="section-fields">
+                    {section.fields.map((field) => (
+                      <div key={field.id} className="field-container">
+                        <span className="field-icon">{field.icon}</span>
+                        <LabeledInput
+                          id={field.id}
+                          label={field.label}
+                          type={field.type || "text"}
+                          value={form[field.id] || ""}
+                          onChange={handleChange}
+                          placeholder={field.placeholder || ""}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-
-              <div className="form-section">
-                <h2 className="section-title">Process Parameters</h2>
-                <div className="section-fields">
-                  <div className="field-container">
-                    <span className="field-icon">🔥</span>
-                    <LabeledInput
-                      id="precursor"
-                      label="Precursor"
-                      value={form.precursor}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="field-container">
-                    <span className="field-icon">⚡</span>
-                    <LabeledInput
-                      id="coreactant"
-                      label="Co-reactant"
-                      value={form.coreactant}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="field-container">
-                    <span className="field-icon">🌡️</span>
-                    <LabeledInput
-                      id="temperature"
-                      label="Temperature (°C)"
-                      type="number"
-                      value={form.temperature}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Second row: Publication Details + Authors */}
+            {/* Second row: Publication Details + Authors - NOW DYNAMIC */}
             <div className="form-sections-row">
               <div className="form-section">
                 <h2 className="section-title">Publication Details</h2>
                 <div className="section-fields">
-                  <div className="field-container">
-                    <span className="field-icon">📰</span>
-                    <LabeledInput
-                      id="publication.journal"
-                      label="Journal Abbreviation"
-                      value={form.publication.journal}
-                      onChange={handleChange}
-                      placeholder="e.g., ACS Nano"
-                    />
-                  </div>
-                  <div className="field-container">
-                    <span className="field-icon">📅</span>
-                    <LabeledInput
-                      id="publication.year"
-                      label="Publication Year"
-                      type="number"
-                      value={form.publication.year}
-                      onChange={handleChange}
-                      placeholder="e.g., 2023"
-                    />
-                  </div>
-                  <div className="field-container">
-                    <span className="field-icon">🔗</span>
-                    <LabeledInput
-                      id="publication.doi"
-                      label="DOI"
-                      value={form.publication.doi}
-                      onChange={handleChange}
-                      placeholder="e.g., 10.1021/example"
-                    />
-                  </div>
+                  {sections[2].fields.map((field) => (
+                    <div
+                      key={field.id}
+                      className={`field-container ${
+                        field.id === "publication.title" ||
+                        field.id === "publication.doi" ||
+                        field.id === "publication.journal_full"
+                          ? "full-width"
+                          : ""
+                      }`}
+                    >
+                      <span className="field-icon">{field.icon}</span>
+                      <LabeledInput
+                        id={field.id}
+                        label={field.label}
+                        type={field.type || "text"}
+                        value={field.id
+                          .split(".")
+                          .reduce((obj, key) => obj[key], form)}
+                        onChange={handleChange}
+                        placeholder={field.placeholder || ""}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -372,7 +375,7 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
               </div>
             </div>
 
-            {/* Full width: Surface Details */}
+            {/* Full width: Surface Details - NO CHANGES NEEDED */}
             <div className="form-section">
               <h2 className="section-title">
                 <span className="field-icon">📊</span>

@@ -18,7 +18,7 @@ const AdminCleanup = ({ setUser, isAuthorized, user }) => {
 
     try {
       const response = await fetch(
-        `${config.BACKEND_API_URL}/api/cleanup-author-field`,
+        `${config.BACKEND_API_URL}/api/initialize-publication-fields`,
         {
           method: "POST",
           credentials: "include",

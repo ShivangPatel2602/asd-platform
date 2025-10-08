@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ASDParameters:
-    """Data class for ASD parameters"""
     deposited_material: str = "Not specified"
     element: str = "Not specified"
     deposition_technique: str = "Not specified"
@@ -24,7 +23,20 @@ class ASDParameters:
     coreactant: str = "Not specified"
     surface_substrate: str = "Not specified"
     surface_pretreatment: str = "Not specified"
+    title: str = "Not specified"
+    authors: List[str] = None
+    journal: str = "Not specified"
+    journal_full: str = "Not specified"
+    year: str = "Not specified"
+    volume: str = "Not specified"
+    issue: str = "Not specified"
+    pages: str = "Not specified"
+    doi: str = "Not specified"
     confidence: str = "low"
+
+    def __post_init__(self):
+        if self.authors is None:
+            self.authors = []
 
 class PDFTextExtractor:
     """Handles PDF text extraction with multiple fallback methods"""
@@ -61,10 +73,8 @@ class PDFTextExtractor:
         """Extract text with fallback methods"""
         logger.info(f"Extracting text from: {pdf_path}")
         
-        # Try PyMuPDF first (better for research papers)
         text = self.extract_with_pymupdf(pdf_path)
         
-        # Fallback to PyPDF2 if needed
         if not text.strip():
             logger.warning("PyMuPDF failed, trying PyPDF2...")
             text = self.extract_with_pypdf2(pdf_path)
@@ -79,7 +89,6 @@ class TextPreprocessor:
     """Handles text preprocessing and filtering"""
     
     def __init__(self):
-        # Keywords for identifying relevant sections
         self.asd_keywords = [
             'area selective', 'area-selective', 'selective deposition', 
             'selective growth', 'ALD', 'CVD', 'atomic layer deposition',
@@ -185,41 +194,72 @@ class GeminiASDExtractor:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         
-        # Optimized prompt for token efficiency
-        self.prompt = """Extract Area Selective Deposition parameters from this research paper. Return ONLY explicitly stated information.
+        self.prompt = self.prompt = """Extract Area Selective Deposition parameters AND complete bibliographic information from this research paper. Return ONLY explicitly stated information.
 
-                        Extract These 7 Parameters:
-                        1. **Deposited Material** - Target material (ZnO, TiO2, Al2O3, etc.)
-                        2. **Element** - Primary element from material formula (Zn, Ti, Al, etc.)
-                        3. **Deposition Technique** - Method used (ALD, CVD, PECVD, MLD, etc.)
-                        4. **Precursor** - Source compound used for deposition
-                        5. **Coreactant** - Reactive species (H2O, O2, NH3, plasma, etc.)
-                        6. **Surface/Substrate** - Base material (Si, SiO2, glass, metal, etc.)
-                        7. **Surface Pretreatment** - Cleaning/treatment before deposition
+Extract These 16 Parameters:
 
-                        Search Locations: Abstract, Methods/Experimental, Results, Tables, Figure captions
+**Deposition Parameters:**
+1. **Deposited Material** - Target material (ZnO, TiO2, Al2O3, etc.)
+2. **Element** - Primary element from material formula (Zn, Ti, Al, etc.)
+3. **Deposition Technique** - Method used (ALD, CVD, PECVD, MLD, etc.)
+4. **Precursor** - Source compound used for deposition
+5. **Coreactant** - Reactive species (H2O, O2, NH3, plasma, etc.)
+6. **Surface/Substrate** - Base material (Si, SiO2, glass, metal, etc.)
+7. **Surface Pretreatment** - Cleaning/treatment before deposition
 
-                        Common Terms:
-                        - ASD: "selective deposition", "area-selective growth"
-                        - Precursor: "metal source", "organometallic", "source material"
-                        - Surface treatment: "surface prep", "cleaning", "activation"
+**Bibliographic Information:**
+8. **Title** - Full paper title
+9. **Authors** - ALL authors as array (e.g., ["Smith, J.", "Doe, A.", "Johnson, B."])
+10. **Journal** - Abbreviated journal name (e.g., "ACS Nano")
+11. **Journal Full** - Full journal name (e.g., "ACS Nano - American Chemical Society")
+12. **Year** - Publication year
+13. **Volume** - Journal volume number
+14. **Issue** - Journal issue number
+15. **Pages** - Page range (e.g., "1234-1245")
+16. **DOI** - Digital Object Identifier
 
-                        Output Format (JSON only):
-                        {
-                        "deposited_material": "value or Not specified",
-                        "element": "value or Not specified", 
-                        "deposition_technique": "value or Not specified",
-                        "precursor": "value or Not specified",
-                        "coreactant": "value or Not specified",
-                        "surface_substrate": "value or Not specified",
-                        "surface_pretreatment": "value or Not specified",
-                        "confidence": "high/medium/low"
-                        }
+Search Locations: 
+- Title/Abstract for bibliographic info
+- Methods/Experimental for deposition parameters
+- Results, Tables, Figure captions for details
+- First page/header for journal info
 
-                        If multiple experiments exist, extract from the primary/main one. Mark unclear info as "Not specified".
+Common Terms:
+- ASD: "selective deposition", "area-selective growth"
+- Precursor: "metal source", "organometalical", "source material"
+- Surface treatment: "surface prep", "cleaning", "activation"
+- Authors: Look for "by", "authored by", or author list format
 
-                        Research Paper Content:
-                        """
+Output Format (JSON only):
+{
+  "deposited_material": "value or Not specified",
+  "element": "value or Not specified", 
+  "deposition_technique": "value or Not specified",
+  "precursor": "value or Not specified",
+  "coreactant": "value or Not specified",
+  "surface_substrate": "value or Not specified",
+  "surface_pretreatment": "value or Not specified",
+  "title": "value or Not specified",
+  "authors": ["Author1", "Author2", "Author3"] or [],
+  "journal": "value or Not specified",
+  "journal_full": "value or Not specified",
+  "year": "value or Not specified",
+  "volume": "value or Not specified",
+  "issue": "value or Not specified",
+  "pages": "value or Not specified",
+  "doi": "value or Not specified",
+  "confidence": "high/medium/low"
+}
+
+IMPORTANT: 
+- Extract ALL authors, not just the first one
+- Authors should be in format: "LastName, FirstInitial."
+- If multiple experiments exist, extract from the primary/main one
+- Mark unclear info as "Not specified"
+- For authors array, return empty array [] if not found, not "Not specified"
+
+Research Paper Content:
+"""
     
     def extract_parameters(self, text: str) -> ASDParameters:
         """Extract ASD parameters using Gemini"""
@@ -245,11 +285,16 @@ class GeminiASDExtractor:
     def _parse_response(self, response_text: str) -> ASDParameters:
         """Parse JSON response from Gemini"""
         try:
-            # Extract JSON from response (in case there's extra text)
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
                 data = json.loads(json_str)
+                
+                authors = data.get('authors', [])
+                if isinstance(authors, str):
+                    authors = [authors] if authors != "Not specified" else []
+                elif not isinstance(authors, list):
+                    authors = []
                 
                 return ASDParameters(
                     deposited_material=data.get('deposited_material', 'Not specified'),
@@ -259,11 +304,20 @@ class GeminiASDExtractor:
                     coreactant=data.get('coreactant', 'Not specified'),
                     surface_substrate=data.get('surface_substrate', 'Not specified'),
                     surface_pretreatment=data.get('surface_pretreatment', 'Not specified'),
+                    title=data.get('title', 'Not specified'),
+                    authors=authors,
+                    journal=data.get('journal', 'Not specified'),
+                    journal_full=data.get('journal_full', 'Not specified'),
+                    year=data.get('year', 'Not specified'),
+                    volume=data.get('volume', 'Not specified'),
+                    issue=data.get('issue', 'Not specified'),
+                    pages=data.get('pages', 'Not specified'),
+                    doi=data.get('doi', 'Not specified'),
                     confidence=data.get('confidence', 'low')
                 )
             else:
                 raise ValueError("No JSON found in response")
-                
+            
         except Exception as e:
             logger.error(f"Failed to parse response: {e}")
             logger.error(f"Raw response: {response_text}")
@@ -301,6 +355,15 @@ class ASDParameterExtractor:
                 'coreactant': parameters.coreactant,
                 'surface_substrate': parameters.surface_substrate,
                 'surface_pretreatment': parameters.surface_pretreatment,
+                'title': parameters.title,
+                'authors': parameters.authors,
+                'journal': parameters.journal,
+                'journal_full': parameters.journal_full,
+                'year': parameters.year,
+                'volume': parameters.volume,
+                'issue': parameters.issue,
+                'pages': parameters.pages,
+                'doi': parameters.doi,
                 'confidence': parameters.confidence,
                 'text_length': len(processed_text),
                 'status': 'success'

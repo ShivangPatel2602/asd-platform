@@ -316,19 +316,30 @@ def add_data_to_db(data, submitter):
     if isinstance(publication_data, str):
         publication_data = {
             "authors": [publication_data],
+            "title": "",
             "doi": "",
             "journal": "",
-            "year": ""
+            "journal_full": "",
+            "year": "",
+            "volume": "",
+            "issue": "",
+            "pages": ""
         }
     authors = publication_data.get("authors", [])
     if isinstance(authors, str):
         authors = [authors]
     elif not authors and publication_data.get("author"):
         authors = [publication_data.get("author")]
+
     publication_data = {
         "authors": authors,
+        "title": publication_data.get("title", ""),
         "journal": publication_data.get("journal", ""),
+        "journal_full": publication_data.get("journal_full", ""),
         "year": publication_data.get("year", ""),
+        "volume": publication_data.get("volume", ""),
+        "issue": publication_data.get("issue", ""),
+        "pages": publication_data.get("pages", ""),
         "doi": publication_data.get("doi", "")
     }
     readings = data.get("readings", [])
@@ -388,22 +399,25 @@ def add_data_to_db(data, submitter):
         pair_doc["conditions"].append(condition_doc)
         
     def matches_publication(existing_pub, new_pub_data):
-        existing_authors = existing_pub["publication"].get("authors", [existing_pub["publication"].get("author", "")])
+        """Check if publications match based on authors and key metadata"""
+        existing_authors = existing_pub.get("authors", [existing_pub.get("author", "")])
         new_authors = new_pub_data.get("authors", [])
         
-        # Convert single author to list format for comparison
         if isinstance(existing_authors, str):
             existing_authors = [existing_authors]
         if isinstance(new_authors, str):
             new_authors = [new_authors]
-            
-        # Match if first authors are the same and journal/year match
+        
         first_author_match = (existing_authors and new_authors and 
                             existing_authors[0] == new_authors[0])
-        journal_match = existing_pub["publication"]["journal"] == new_pub_data["journal"]
-        year_match = existing_pub["publication"]["year"] == new_pub_data["year"]
+        journal_match = existing_pub.get("journal") == new_pub_data.get("journal")
+        year_match = existing_pub.get("year") == new_pub_data.get("year")
         
-        return first_author_match and journal_match and year_match
+        title_match = True
+        if existing_pub.get("title") and new_pub_data.get("title"):
+            title_match = existing_pub.get("title") == new_pub_data.get("title")
+        
+        return first_author_match and journal_match and year_match and title_match
 
     pub_doc = next(
         (p for p in condition_doc.get("publications", [])
@@ -591,9 +605,9 @@ def notify_authorized_users(data, submitter):
         """
         mail.send(notify_msg)
 
-@app.route("/api/cleanup-author-field", methods=["POST"])
-def cleanup_author_field():
-    """Remove old 'author' field and keep only 'authors' array"""
+@app.route("/api/initialize-publication-fields", methods=["POST"])
+def initialize_publication_fields():
+    """Initialize new publication fields for all existing entries"""
     user = session.get('user')
     if not user:
         return jsonify({"error": "Not authenticated"}), 401
@@ -604,7 +618,6 @@ def cleanup_author_field():
     
     try:
         updated_count = 0
-        
         all_docs = list(collection.find())
         
         for doc in all_docs:
@@ -616,12 +629,12 @@ def cleanup_author_field():
                         for pub in condition.get("publications", []):
                             publication = pub.get("publication", {})
                             
-                            # If it has both 'author' and 'authors', remove 'author'
-                            if "author" in publication:
-                                if "authors" not in publication:
-                                    # Migrate author to authors
-                                    publication["authors"] = [publication["author"]]
-                                # Remove the old author field
+                            # Migrate old 'author' field to 'authors' array
+                            if "author" in publication and "authors" not in publication:
+                                publication["authors"] = [publication["author"]]
+                                del publication["author"]
+                                modified = True
+                            elif "author" in publication:
                                 del publication["author"]
                                 modified = True
                             
@@ -629,18 +642,32 @@ def cleanup_author_field():
                             if "authors" in publication and isinstance(publication["authors"], str):
                                 publication["authors"] = [publication["authors"]]
                                 modified = True
+                            
+                            # Initialize new fields with empty values if not present
+                            new_fields = {
+                                "title": "",
+                                "journal_full": "",
+                                "volume": "",
+                                "issue": "",
+                                "pages": ""
+                            }
+                            
+                            for field, default_value in new_fields.items():
+                                if field not in publication:
+                                    publication[field] = default_value
+                                    modified = True
             
             if modified:
                 collection.replace_one({"_id": doc["_id"]}, doc)
                 updated_count += 1
         
         return jsonify({
-            "message": f"Successfully cleaned up {updated_count} documents",
+            "message": f"Successfully initialized fields in {updated_count} documents",
             "total_checked": len(all_docs)
         }), 200
         
     except Exception as e:
-        print(f"Cleanup error: {str(e)}")
+        print(f"Initialization error: {str(e)}")
         return jsonify({"error": str(e)}), 500
     
 @app.route("/api/extract-filter-params", methods=["POST"])
@@ -733,8 +760,7 @@ def extract_pdf_data():
             # Use your existing script classes directly
             from script import ASDParameterExtractor
             
-            # You'll need to set your Gemini API key here
-            GEMINI_API_KEY = Config.GEMINI_API_KEY  # Add this to your config
+            GEMINI_API_KEY = Config.GEMINI_API_KEY
             extractor = ASDParameterExtractor(GEMINI_API_KEY)
             
             # Use the existing extract_from_pdf method
@@ -752,6 +778,16 @@ def extract_pdf_data():
                     'coreactant': result.get('coreactant', ''),
                     'surface': result.get('surface_substrate', ''),
                     'pretreatment': result.get('surface_pretreatment', ''),
+                    # ADD THESE PUBLICATION FIELDS:
+                    'title': result.get('title', ''),
+                    'authors': result.get('authors', []),
+                    'journal': result.get('journal', ''),
+                    'journal_full': result.get('journal_full', ''),
+                    'year': result.get('year', ''),
+                    'volume': result.get('volume', ''),
+                    'issue': result.get('issue', ''),
+                    'pages': result.get('pages', ''),
+                    'doi': result.get('doi', ''),
                     'confidence': result.get('confidence', 'low')
                 }
                 

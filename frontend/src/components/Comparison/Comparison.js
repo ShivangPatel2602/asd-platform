@@ -33,6 +33,8 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const [showPlots, setShowPlots] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
   const [activeFilterColumn, setActiveFilterColumn] = useState(null);
+  const [selectedPublication, setSelectedPublication] = useState(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const filterDropdownRef = useRef(null);
 
   const location = useLocation();
@@ -499,89 +501,103 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
 
   const formatAuthors = (authors) => {
     if (!authors || authors.length === 0) return "Unknown";
-    if (typeof authors === "string") return authors; // Handle legacy data
+    if (typeof authors === "string") return authors;
 
     if (authors.length === 1) return authors[0];
-    if (authors.length === 2) return `${authors[0]} & ${authors[1]}`;
-    if (authors.length <= 4) return `${authors[0]} et al.`;
-    return `${authors[0]} et al. (${authors.length} authors)`;
+    return `${authors[0]} et al.`;
   };
 
-  // const PublicationCell = ({ publications, index, onSelect }) => {
-  //   const currentSelections = selectedPublications[index] || [];
+  const handleInfoClick = (publication, e) => {
+    e.stopPropagation();
+    setSelectedPublication(publication);
+    setShowInfoModal(true);
+  };
 
-  //   return (
-  //     <div className="publications-list">
-  //       {publications.map((pub, pubIndex) => (
-  //         <div
-  //           key={pubIndex}
-  //           className="publication-entry"
-  //           data-pub-index={pubIndex}
-  //         >
-  //           <span
-  //             className={`publication-tag ${
-  //               currentSelections.some(
-  //                 (p) =>
-  //                   (p.authors?.[0] || p.author) ===
-  //                   (pub.authors?.[0] || pub.author)
-  //               )
-  //                 ? "selected"
-  //                 : ""
-  //             }`}
-  //             onClick={() => onSelect(index, pub)}
-  //             title={pub.authors ? `Authors: ${pub.authors.join(", ")}` : ""}
-  //           >
-  //             <span className="publication-index">{pubIndex + 1}</span>
-  //             {`${formatAuthors(pub.authors || [pub.author])}, ${pub.journal} ${
-  //               pub.year
-  //             }`}
-  //           </span>
-  //         </div>
-  //       ))}
-  //     </div>
-  //   );
-  // };
+  const PublicationInfoModal = ({ publication, onClose }) => {
+    if (!publication) return null;
 
-  // const EnhancedDOICell = ({ publications }) => {
-  //   const hasPublishedDOI = publications.some((pub) => pub.doi);
+    const formatModalAuthors = (authors) => {
+      if (!authors || authors.length === 0) return "Not specified";
+      if (typeof authors === "string") return authors;
+      return authors.join(", ");
+    };
 
-  //   return (
-  //     <div className={`doi-cell ${hasPublishedDOI ? "has-doi" : "no-doi"}`}>
-  //       <div
-  //         className={`doi-status-indicator ${
-  //           hasPublishedDOI ? "published" : "unpublished"
-  //         }`}
-  //       ></div>
-  //       <div className="doi-tooltip">
-  //         {hasPublishedDOI
-  //           ? "Published Research Available"
-  //           : "Unpublished Research Data"}
-  //       </div>
-  //       <div className="doi-list">
-  //         {publications.map((pub, pubIndex) => (
-  //           <div key={pubIndex} className="doi-entry">
-  //             <span className="doi-wrapper">
-  //               <span className="doi-index">{pubIndex + 1}.</span>
-  //               {pub.doi ? (
-  //                 <span
-  //                   className="doi-link"
-  //                   onClick={(e) => {
-  //                     e.stopPropagation();
-  //                     handleDOIClick(pub.doi);
-  //                   }}
-  //                 >
-  //                   {`${pub.author}, ${pub.journal} ${pub.year}`}
-  //                 </span>
-  //               ) : (
-  //                 <span className="doi-not-available">Unpublished</span>
-  //               )}
-  //             </span>
-  //           </div>
-  //         ))}
-  //       </div>
-  //     </div>
-  //   );
-  // };
+    return (
+      <>
+        <div className="modal-backdrop" onClick={onClose} />
+        <div className="publication-info-modal">
+          <div className="modal-header">
+            <h3>Publication Details</h3>
+            <button className="modal-close-btn" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <div className="modal-content">
+            <div className="modal-field">
+              <label>Title:</label>
+              <p>{publication.title || "Not specified"}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Authors:</label>
+              <p>{formatModalAuthors(publication.authors)}</p>
+            </div>
+
+            <div className="modal-field">
+              <label>Journal:</label>
+              <p>
+                {publication.journal_full ||
+                  publication.journal ||
+                  "Not specified"}
+              </p>
+            </div>
+
+            <div className="modal-grid">
+              <div className="modal-field">
+                <label>Year:</label>
+                <p>{publication.year || "Not specified"}</p>
+              </div>
+
+              <div className="modal-field">
+                <label>Volume:</label>
+                <p>{publication.volume || "Not specified"}</p>
+              </div>
+
+              <div className="modal-field">
+                <label>Issue:</label>
+                <p>{publication.issue || "Not specified"}</p>
+              </div>
+
+              <div className="modal-field">
+                <label>Pages:</label>
+                <p>{publication.pages || "Not specified"}</p>
+              </div>
+            </div>
+
+            <div className="modal-field">
+              <label>DOI:</label>
+              {publication.doi ? (
+                <a
+                  href={
+                    publication.doi.startsWith("http")
+                      ? publication.doi
+                      : `https://doi.org/${publication.doi}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="modal-doi-link"
+                >
+                  {publication.doi}
+                </a>
+              ) : (
+                <p>Not specified</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
 
   const CombinedPublicationDOICell = ({ publications, index, onSelect }) => {
     const currentSelections = selectedPublications[index] || [];
@@ -612,6 +628,13 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                 {`${formatAuthors(pub.authors || [pub.author])}, ${
                   pub.journal
                 } ${pub.year}`}
+                <button
+                  className="info-icon-button"
+                  onClick={(e) => handleInfoClick(pub, e)}
+                  title="View publication details"
+                >
+                  ℹ️
+                </button>
                 {pub.doi && (
                   <button
                     className="doi-icon-button"
@@ -1490,6 +1513,15 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
               )}
             </div>
           </>
+        )}
+        {showInfoModal && (
+          <PublicationInfoModal
+            publication={selectedPublication}
+            onClose={() => {
+              setShowInfoModal(false);
+              setSelectedPublication(null);
+            }}
+          />
         )}
       </div>
       <DeleteModal

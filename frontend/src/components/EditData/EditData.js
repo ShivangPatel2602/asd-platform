@@ -122,18 +122,18 @@ const EditData = ({ setUser, isAuthorized, user }) => {
     e.preventDefault();
     try {
       const allPubs = publications.map((pub, index) => {
-      const { author, ...cleanPub } = pub;
-      if (!cleanPub.authors || cleanPub.authors.length === 0) {
-        cleanPub.authors = author ? [author] : [];
-      }
-      
-      return {
-        ...cleanPub,
-        parentFields: publicationFields[index].hasCustomFields
-          ? publicationFields[index]
-          : formData,
-      };
-    });
+        const { author, ...cleanPub } = pub;
+        if (!cleanPub.authors || cleanPub.authors.length === 0) {
+          cleanPub.authors = author ? [author] : [];
+        }
+
+        return {
+          ...cleanPub,
+          parentFields: publicationFields[index].hasCustomFields
+            ? publicationFields[index]
+            : formData,
+        };
+      });
 
       const groups = {};
       allPubs.forEach((pub, idx) => {
@@ -279,15 +279,43 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                     </div>
                   </div>
                 )}
+
                 <div className="form-grid">
+                  <div className="form-group full-width">
+                    <label>Title</label>
+                    <input
+                      type="text"
+                      value={pub.title || ""}
+                      onChange={(e) => {
+                        const newPubs = [...publications];
+                        newPubs[index] = { ...pub, title: e.target.value };
+                        setPublications(newPubs);
+                      }}
+                    />
+                  </div>
                   <div className="form-group">
-                    <label>Journal</label>
+                    <label>Journal (Abbreviated)</label>
                     <input
                       type="text"
                       value={pub.journal}
                       onChange={(e) => {
                         const newPubs = [...publications];
                         newPubs[index] = { ...pub, journal: e.target.value };
+                        setPublications(newPubs);
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Journal (Full Name)</label>
+                    <input
+                      type="text"
+                      value={pub.journal_full || ""}
+                      onChange={(e) => {
+                        const newPubs = [...publications];
+                        newPubs[index] = {
+                          ...pub,
+                          journal_full: e.target.value,
+                        };
                         setPublications(newPubs);
                       }}
                     />
@@ -305,6 +333,43 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                     />
                   </div>
                   <div className="form-group">
+                    <label>Volume</label>
+                    <input
+                      type="text"
+                      value={pub.volume || ""}
+                      onChange={(e) => {
+                        const newPubs = [...publications];
+                        newPubs[index] = { ...pub, volume: e.target.value };
+                        setPublications(newPubs);
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Issue</label>
+                    <input
+                      type="text"
+                      value={pub.issue || ""}
+                      onChange={(e) => {
+                        const newPubs = [...publications];
+                        newPubs[index] = { ...pub, issue: e.target.value };
+                        setPublications(newPubs);
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Pages</label>
+                    <input
+                      type="text"
+                      value={pub.pages || ""}
+                      placeholder="e.g., 1234-1245"
+                      onChange={(e) => {
+                        const newPubs = [...publications];
+                        newPubs[index] = { ...pub, pages: e.target.value };
+                        setPublications(newPubs);
+                      }}
+                    />
+                  </div>
+                  <div className="form-group full-width">
                     <label>DOI</label>
                     <input
                       type="text"
@@ -345,29 +410,6 @@ const EditData = ({ setUser, isAuthorized, user }) => {
                       );
                       handleReadingsChange(index, sanitized);
                     }}
-                    // onKeyDown={(e) => {
-                    //   if (e.key === "Enter") return;
-
-                    //   const allowedKeys = [
-                    //     "Backspace",
-                    //     "Delete",
-                    //     "ArrowLeft",
-                    //     "ArrowRight",
-                    //     "ArrowUp",
-                    //     "ArrowDown",
-                    //     "Tab",
-                    //     " ",
-                    //     ".",
-                    //   ];
-                    //   const isNumber = /^[0-9]$/;
-
-                    //   if (
-                    //     !isNumber.test(e.key) &&
-                    //     !allowedKeys.includes(e.key)
-                    //   ) {
-                    //     e.preventDefault();
-                    //   }
-                    // }}
                     rows={10}
                     placeholder="Format: cycle thickness&#10;Example:&#10;0 0&#10;10 0.5"
                   />
