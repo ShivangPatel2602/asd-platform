@@ -277,7 +277,7 @@ const FormInput = ({ setUser, user, isAuthorized }) => {
 
   return (
     <>
-      <Navbar setUser={setUser} isAuthorized={isAuthorized} />
+      <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
       <div className="form-page">
         <h1 className="form-title">Submit New Data</h1>
         <form onSubmit={handleSubmit} className="form-container">

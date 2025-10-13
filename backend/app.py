@@ -487,13 +487,17 @@ def update_data():
         for group in updated_groups:
             for pub_data in group["publications"]:
                 normalized_pub = {
+                    "authors": pub_data.get("authors", []),
+                    "title": pub_data.get("title", ""),
                     "journal": pub_data.get("journal", ""),
+                    "journal_full": pub_data.get("journal_full", ""),
                     "year": pub_data.get("year", ""),
-                    "doi": pub_data.get("doi", ""),
-                    "authors": pub_data.get("authors", [])
+                    "volume": pub_data.get("volume", ""),
+                    "issue": pub_data.get("issue", ""),
+                    "pages": pub_data.get("pages", ""),
+                    "doi": pub_data.get("doi", "")
                 }
                 
-                # Fallback: if authors is empty but author exists, migrate it
                 if not normalized_pub["authors"] and pub_data.get("author"):
                     normalized_pub["authors"] = [pub_data["author"]]
                 
