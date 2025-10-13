@@ -30,7 +30,7 @@ const PDFUploader = ({ onDataExtracted, isLoading, setIsLoading }) => {
       console.log("Uploading PDF:", file.name, "Size:", file.size);
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || ""}/api/extract-pdf-data`,
+        `${process.env.REACT_APP_BACKEND_API_URL || ""}/api/extract-pdf-data`,
         {
           method: "POST",
           body: formData,
