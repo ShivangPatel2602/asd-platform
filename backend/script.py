@@ -10,7 +10,6 @@ import logging
 from dataclasses import dataclass
 from config import Config
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -335,17 +334,9 @@ class ASDParameterExtractor:
         """Main method to extract ASD parameters from PDF"""
         try:
             logger.info(f"Starting extraction for: {pdf_path}")
-            
-            # Step 1: Extract text from PDF
             raw_text = self.pdf_extractor.extract_text(pdf_path)
-            
-            # Step 2: Preprocess text
             processed_text = self.preprocessor.preprocess(raw_text)
-            
-            # Step 3: Extract parameters using Gemini
             parameters = self.gemini_extractor.extract_parameters(processed_text)
-            
-            # Convert to dictionary for easy serialization
             result = {
                 'pdf_file': os.path.basename(pdf_path),
                 'deposited_material': parameters.deposited_material,
@@ -382,7 +373,6 @@ class ASDParameterExtractor:
 
 def main():
     """Example usage"""
-    # Configuration
     GEMINI_API_KEY = Config.GEMINI_API_KEY
     PDF_PATH = "LLM Training/Park et al 2006 Full Paper.pdf"
     

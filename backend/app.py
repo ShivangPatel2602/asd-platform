@@ -740,38 +740,92 @@ def get_materials():
     materials = [m["material"] for m in doc.get("materials", [])]
     return jsonify(materials)
 
-@app.route("/api/extract-pdf-data", methods=["POST"])
+@app.route("/api/extract-pdf-data", methods=["POST", "OPTIONS"])
 def extract_pdf_data():
-    user = session.get('user')
-    if not user:
-        return jsonify({"error": "Not authenticated"}), 401
-    
-    if 'pdf' not in request.files:
-        return jsonify({"error": "No PDF file provided"}), 400
-    
-    file = request.files['pdf']
-    if file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
-    
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "File must be a PDF"}), 400
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        return response
     
     try:
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            file.save(tmp_file.name)
+        user = session.get('user')
+        if not user:
+            app.logger.error("Unauthorized access attempt to PDF extraction")
+            return jsonify({"status": "error", "error": "Not authenticated"}), 401
+        
+        app.logger.info(f"PDF extraction request from user: {user.get('email')}")
+        
+        if 'pdf' not in request.files:
+            app.logger.error("No PDF file in request")
+            return jsonify({"status": "error", "error": "No PDF file provided"}), 400
+        
+        file = request.files['pdf']
+        if file.filename == '':
+            app.logger.error("Empty filename")
+            return jsonify({"status": "error", "error": "No file selected"}), 400
+        
+        if not file.filename.lower().endswith('.pdf'):
+            app.logger.error(f"Invalid file type: {file.filename}")
+            return jsonify({"status": "error", "error": "File must be a PDF"}), 400
+        
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        
+        app.logger.info(f"Processing PDF: {file.filename}, Size: {file_size} bytes")
+        
+        if file_size > 10 * 1024 * 1024:
+            app.logger.error(f"File too large: {file_size} bytes")
+            return jsonify({"status": "error", "error": "PDF file too large. Maximum size is 10MB"}), 400
+        
+        if file_size == 0:
+            app.logger.error("Empty file uploaded")
+            return jsonify({"status": "error", "error": "Uploaded file is empty"}), 400
+        
+        tmp_file_path = None
+        
+        try:
+            if not Config.GEMINI_API_KEY:
+                app.logger.error("GEMINI_API_KEY not configured")
+                return jsonify({
+                    "status": "error",
+                    "error": "AI extraction service not configured. Please contact administrator."
+                }), 500
+            try:
+                tmp_dir = tempfile.gettempdir()
+                app.logger.info(f"Using temp directory: {tmp_dir}")
+                fd, tmp_file_path = tempfile.mkstemp(suffix='.pdf', dir=tmp_dir)
+                os.close(fd)
+                file.save(tmp_file_path)
+                app.logger.info(f"PDF saved to: {tmp_file_path}")
+                if not os.path.exists(tmp_file_path):
+                    raise Exception("Failed to save file to temporary location")
+                
+                saved_size = os.path.getsize(tmp_file_path)
+                app.logger.info(f"Saved file size: {saved_size} bytes")
+                
+            except Exception as e:
+                app.logger.error(f"Failed to create temp file: {str(e)}")
+                app.logger.error(traceback.format_exc())
+                return jsonify({
+                    "status": "error",
+                    "error": f"Failed to process uploaded file: {str(e)}"
+                }), 500
+            try:
+                from script import ASDParameterExtractor
+                app.logger.info("ASDParameterExtractor imported successfully")
+            except ImportError as ie:
+                app.logger.error(f"Failed to import ASDParameterExtractor: {str(ie)}")
+                return jsonify({
+                    "status": "error",
+                    "error": "Extraction module not available"
+                }), 500
             
-            # Use your existing script classes directly
-            from script import ASDParameterExtractor
+            app.logger.info("Initializing ASDParameterExtractor...")
+            extractor = ASDParameterExtractor(Config.GEMINI_API_KEY)
             
-            GEMINI_API_KEY = Config.GEMINI_API_KEY
-            extractor = ASDParameterExtractor(GEMINI_API_KEY)
-            
-            # Use the existing extract_from_pdf method
-            result = extractor.extract_from_pdf(tmp_file.name)
-            
-            # Clean up temporary file
-            os.unlink(tmp_file.name)
+            app.logger.info("Starting PDF extraction...")
+            result = extractor.extract_from_pdf(tmp_file_path)
+            app.logger.info(f"Extraction completed with status: {result.get('status')}")
             
             if result['status'] == 'success':
                 form_data = {
@@ -782,7 +836,6 @@ def extract_pdf_data():
                     'coreactant': result.get('coreactant', ''),
                     'surface': result.get('surface_substrate', ''),
                     'pretreatment': result.get('surface_pretreatment', ''),
-                    # ADD THESE PUBLICATION FIELDS:
                     'title': result.get('title', ''),
                     'authors': result.get('authors', []),
                     'journal': result.get('journal', ''),
@@ -795,19 +848,46 @@ def extract_pdf_data():
                     'confidence': result.get('confidence', 'low')
                 }
                 
-                return jsonify({
+                app.logger.info("Successfully extracted data from PDF")
+                response_data = {
                     'status': 'success',
                     'data': form_data,
                     'confidence': result.get('confidence', 'low')
-                })
+                }
+                app.logger.info(f"Sending response: {response_data}")
+                return jsonify(response_data), 200
             else:
+                error_msg = result.get('error', 'Extraction failed')
+                app.logger.error(f"Extraction failed: {error_msg}")
                 return jsonify({
                     'status': 'error', 
-                    'error': result.get('error', 'Extraction failed')
+                    'error': error_msg
                 }), 500
-                
-    except Exception as e:
-        return jsonify({'status': 'error', 'error': str(e)}), 500
+                    
+        except Exception as e:
+            error_msg = f"Unexpected error during PDF extraction: {str(e)}"
+            app.logger.error(error_msg)
+            app.logger.error(traceback.format_exc())
+            return jsonify({
+                'status': 'error', 
+                'error': error_msg
+            }), 500
+            
+        finally:
+            if tmp_file_path and os.path.exists(tmp_file_path):
+                try:
+                    os.unlink(tmp_file_path)
+                    app.logger.info(f"Cleaned up temp file: {tmp_file_path}")
+                except Exception as e:
+                    app.logger.warning(f"Failed to delete temp file {tmp_file_path}: {e}")
+    
+    except Exception as outer_e:
+        app.logger.error(f"Outer exception in extract_pdf_data: {str(outer_e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({
+            'status': 'error',
+            'error': f'Server error: {str(outer_e)}'
+        }), 500
 
 @app.route("/api/precursors", methods=["GET"])
 def get_precursors_and_coreactants():
