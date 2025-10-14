@@ -136,8 +136,6 @@ const BestScenarioParams = ({
     td: 0,
   });
   const [isEditing, setIsEditing] = useState(false);
-
-  // Initialize editableParams when component receives new props
   React.useEffect(() => {
     console.log("BestScenarioParams: Received props:", {
       scenario,
@@ -152,7 +150,6 @@ const BestScenarioParams = ({
       td: 0,
     };
 
-    // Set active parameters from the params array
     activeLabels.forEach((label, index) => {
       if (params && params.length > index) {
         newParams[label] = params[index];
@@ -171,10 +168,25 @@ const BestScenarioParams = ({
     return labels;
   };
 
-  // Get active parameter labels for the current scenario
+  const getParamUnit = (label) => {
+    const unitMap = {
+      nhat: (
+        <span>
+          nm<sup>-2</sup>
+        </span>
+      ),
+      ndot0: (
+        <span>
+          nm<sup>-2</sup> cycle<sup>-1</sup>
+        </span>
+      ),
+      td: "cycles",
+    };
+    return unitMap[label];
+  };
+
   const activeParamLabels = getParamLabels(scenario);
 
-  // Always show all three parameters
   const allParamLabels = ["nhat", "ndot0", "td"];
 
   const getParamValue = (label) => {
@@ -182,7 +194,7 @@ const BestScenarioParams = ({
     if (activeIndex !== -1 && params && params.length > activeIndex) {
       return params[activeIndex];
     }
-    return 0; // Default value for inactive parameters
+    return 0;
   };
 
   const isParamActive = (label) => {
@@ -198,17 +210,11 @@ const BestScenarioParams = ({
   };
 
   const handleApplyChanges = () => {
-    console.log("Applying parameter changes:", editableParams);
-
-    // IMPORTANT: Always send all three parameters in [nhat, ndot0, td] order
     const newParams = [
       editableParams.nhat,
       editableParams.ndot0,
       editableParams.td,
     ];
-
-    console.log("Sending parameters to backend:", newParams);
-    console.log("Current scenario:", scenario);
 
     onParamsChange(newParams);
     setIsEditing(false);
@@ -226,15 +232,27 @@ const BestScenarioParams = ({
 
   return (
     <div className="best-scenario-params">
-      <h3>Best Scenario: {scenario}</h3>
+      <h3>
+        Best Scenario:{" "}
+        {scenario
+          .replace(/nhat/g, "n̂₀")
+          .replace(/ndot0/g, "ṅ₀")
+          .replace(/td/g, "tₑ")}
+      </h3>
       <div className="rmse-display">
-        <strong>RMSE:</strong> {formatToThreeDecimals(rmse)}
+        <strong>Error:</strong> {formatToThreeDecimals(rmse)}
       </div>
 
       <div className="params-display">
         <h4>Parameter Values:</h4>
         <div style={{ fontSize: "0.8em", color: "#666", marginBottom: "8px" }}>
-          Active parameters: [{activeParamLabels.join(", ")}]
+          Active parameters: [
+          {activeParamLabels
+            .join(", ")
+            .replace(/nhat/g, "n̂₀")
+            .replace(/ndot0/g, "ṅ₀")
+            .replace(/td/g, "tₑ")}
+          ]
         </div>
         {allParamLabels.map((label) => (
           <div key={label} className="param-row">
@@ -249,24 +267,30 @@ const BestScenarioParams = ({
               )}
             </span>
             {isEditing ? (
-              <input
-                type="number"
-                value={editableParams[label]}
-                onChange={(e) => handleParamChange(label, e.target.value)}
-                step="0.0001"
-                className="param-input"
-                style={{
-                  backgroundColor: isParamActive(label) ? "#fff" : "#f5f5f5",
-                  color: isParamActive(label) ? "#000" : "#666",
-                }}
-              />
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <input
+                  type="number"
+                  value={editableParams[label]}
+                  onChange={(e) => handleParamChange(label, e.target.value)}
+                  step="0.0001"
+                  className="param-input"
+                  style={{
+                    backgroundColor: isParamActive(label) ? "#fff" : "#f5f5f5",
+                    color: isParamActive(label) ? "#000" : "#666",
+                  }}
+                />
+                <span className="param-unit">{getParamUnit(label)}</span>
+              </div>
             ) : (
               <span
                 className={`param-value ${
                   isParamActive(label) ? "active" : "inactive"
                 }`}
               >
-                {formatToThreeDecimals(getParamValue(label))}
+                {formatToThreeDecimals(getParamValue(label))}{" "}
+                {getParamUnit(label)}
               </span>
             )}
           </div>
@@ -282,7 +306,6 @@ const BestScenarioParams = ({
             >
               Modify Parameters
             </button>
-            {/* NEW: Reset to Original button */}
             {hasBeenModified && (
               <button
                 className="reset-btn"
@@ -308,7 +331,6 @@ const BestScenarioParams = ({
   );
 };
 
-// Custom legend component
 const CustomLegend = (props) => {
   const { payload } = props;
 
@@ -635,7 +657,7 @@ const ModelData = ({ setUser, isAuthorized, user }) => {
                         name === bestScenario ? "best" : ""
                       }`}
                     >
-                      <strong>{displayName}:</strong> RMSE ={" "}
+                      <strong>{displayName}:</strong> Error ={" "}
                       {formatToThreeDecimals(result.rmse)}
                     </div>
                   );

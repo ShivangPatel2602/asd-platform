@@ -15,6 +15,101 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+const classifySurfaceType = (readingsData) => {
+  if (!Array.isArray(readingsData) || readingsData.length < 3) {
+    return 'unknown';
+  }
+  const sortedData = [...readingsData].sort((a, b) => a.cycles - b.cycles);
+  
+  let score = 0;
+  const details = [];
+  
+  const threshold = 0.1;
+  let consecutiveZeros = 0;
+  for (let i = 0; i < Math.min(6, sortedData.length); i++) {
+    if (sortedData[i].thickness <= threshold) {
+      consecutiveZeros++;
+    } else {
+      break;
+    }
+  }
+  
+  if (consecutiveZeros >= 3) {
+    score -= 10;
+    details.push(`${consecutiveZeros} near-zero initial points → non-growth`);
+  } else if (consecutiveZeros <= 1) {
+    score += 5;
+    details.push(`Only ${consecutiveZeros} near-zero points → growth`);
+  }
+  
+  const growthOnsetIndex = sortedData.findIndex(d => d.thickness > 1.0);
+  if (growthOnsetIndex >= 3) {
+    score -= 5; 
+    details.push(`Growth onset at point ${growthOnsetIndex} → non-growth`);
+  } else if (growthOnsetIndex === 1 || growthOnsetIndex === 2) {
+    score += 5; 
+    details.push(`Growth onset at point ${growthOnsetIndex} → growth`);
+  } else if (growthOnsetIndex === 0) {
+    score += 8;
+    details.push(`Immediate growth from point 0 → growth`);
+  }
+  
+  const firstNonZero = sortedData.findIndex(d => d.thickness > threshold);
+  if (firstNonZero >= 0 && firstNonZero < sortedData.length - 1) {
+    const idx1 = firstNonZero;
+    const idx2 = Math.min(firstNonZero + 2, sortedData.length - 1);
+    
+    const cycleDiff = sortedData[idx2].cycles - sortedData[idx1].cycles;
+    const thicknessDiff = sortedData[idx2].thickness - sortedData[idx1].thickness;
+    const growthRate = cycleDiff > 0 ? thicknessDiff / cycleDiff : 0;
+    
+    if (growthRate < 0.03) {
+      score -= 3;
+      details.push(`Low growth rate ${growthRate.toFixed(4)} nm/cycle → non-growth`);
+    } else if (growthRate > 0.1) {
+      score += 3;
+      details.push(`High growth rate ${growthRate.toFixed(4)} nm/cycle → growth`);
+    }
+  }
+  
+  if (sortedData.length >= 5) {
+    const quarterPoint = sortedData[Math.floor(sortedData.length / 4)].thickness;
+    const halfPoint = sortedData[Math.floor(sortedData.length / 2)].thickness;
+    const endPoint = sortedData[sortedData.length - 1].thickness;
+    
+    if (endPoint > 0) {
+      const quarterRatio = quarterPoint / endPoint;
+      const halfRatio = halfPoint / endPoint;
+      
+      if (halfRatio < 0.3 && quarterRatio < 0.1) {
+        score -= 4;
+        details.push(`Concave up curve (delayed growth) → non-growth`);
+      } else if (halfRatio > 0.4 && quarterRatio > 0.2) {
+        score += 4;
+        details.push(`Linear/early growth curve → growth`);
+      }
+    }
+  }
+  
+  if (sortedData.length >= 2) {
+    if (sortedData[1].thickness > 1.5) {
+      score += 6;
+      details.push(`Thickness ${sortedData[1].thickness.toFixed(2)} nm at point 1 → growth`);
+    } else if (sortedData[1].thickness <= threshold) {
+      score -= 2;
+      details.push(`Near-zero at point 1 → non-growth`);
+    }
+  }
+  
+  if (score <= -5) {
+    return 'non-growth';
+  } else if (score >= 5) {
+    return 'growth';
+  } else {
+    return consecutiveZeros >= 3 ? 'non-growth' : 'growth';
+  }
+};
+
 const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const [element, setElement] = useState("");
   const [elementData, setElementData] = useState([]);
@@ -23,6 +118,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [readings, setReadings] = useState({});
+  const [surfaceTypes, setSurfaceTypes] = useState({});
   const [selectivityData, setSelectivityData] = useState([]);
   const [deleteModalConfig, setDeleteModalConfig] = useState({
     isOpen: false,
@@ -234,6 +330,36 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     }
   }, [elementData, mergedRows]);
 
+  const getFirstGrowthSurface = () => {
+    const keys = Object.keys(readings);
+    for (const key of keys) {
+      if (surfaceTypes[key] === "growth") {
+        return key;
+      }
+    }
+    return null;
+  };
+
+  const getFirstNonGrowthSurface = () => {
+    const keys = Object.keys(readings);
+    for (const key of keys) {
+      if (surfaceTypes[key] === "non-growth") {
+        return key;
+      }
+    }
+    return null;
+  };
+
+  const hasBothSurfaceTypes = () => {
+    const hasGrowth = Object.keys(readings).some(
+      (key) => surfaceTypes[key] === "growth"
+    );
+    const hasNonGrowth = Object.keys(readings).some(
+      (key) => surfaceTypes[key] === "non-growth"
+    );
+    return hasGrowth && hasNonGrowth;
+  };
+
   const handlePublicationSelect = (rowKey, publication) => {
     setSelectedPublications((prev) => {
       const currentRowSelections = prev[rowKey] || [];
@@ -261,6 +387,12 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           }
 
           return newReadings;
+        });
+
+        setSurfaceTypes((prevTypes) => {
+          const newTypes = { ...prevTypes };
+          delete newTypes[compositeKey];
+          return newTypes;
         });
 
         return {
@@ -395,9 +527,14 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
           cycles: Number(reading.cycles),
           thickness: Number(reading.thickness),
         }));
+        const surfaceType = classifySurfaceType(normalizedData);
         setReadings((prev) => ({
           ...prev,
           [compositeKey]: normalizedData,
+        }));
+        setSurfaceTypes((prev) => ({
+          ...prev,
+          [compositeKey]: surfaceType,
         }));
         setShowChart(true);
         setShowPlots(true);
@@ -710,6 +847,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   const handleClearSelections = () => {
     setSelectedPublications({});
     setReadings({});
+    setSurfaceTypes({});
     setShowChart(false);
     setShowPlots(false);
     localStorage.removeItem("comparisonPageState");
@@ -891,26 +1029,35 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   };
 
   const handleModelDataRedirect = () => {
-    const readingsArray = Object.values(readings);
-    if (readingsArray.length !== 2) return;
+    const firstGrowthKey = getFirstGrowthSurface();
+    const firstNonGrowthKey = getFirstNonGrowthSurface();
 
-    const [data1, data2] = readingsArray;
-    const growthData = data1
+    if (!firstGrowthKey || !firstNonGrowthKey) {
+      console.error("Missing growth or non-growth surface data");
+      return;
+    }
+
+    const growthData = readings[firstGrowthKey];
+    const nonGrowthData = readings[firstNonGrowthKey];
+
+    const growthInput = growthData
       .map((reading) => `${reading.cycles} ${reading.thickness}`)
       .join("\n");
-    const nonGrowthData = data2
+    const nonGrowthInput = nonGrowthData
       .map((reading) => `${reading.cycles} ${reading.thickness}`)
       .join("\n");
+
     const selectionState = {
       selectedPublications,
       readings,
       showPlots: true,
       showChart: true,
     };
+
     navigate("/model-data", {
       state: {
-        growthInput: growthData,
-        nonGrowthInput: nonGrowthData,
+        growthInput: growthInput,
+        nonGrowthInput: nonGrowthInput,
         autoCompute: true,
         returnTo: {
           path: location.pathname + location.search,
@@ -1323,7 +1470,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                       <span>✕</span>
                       Collapse Plots
                     </button>
-                    {Object.keys(readings).length === 2 && (
+                    {hasBothSurfaceTypes() && (
                       <button
                         className="model-data-btn"
                         onClick={handleModelDataRedirect}
