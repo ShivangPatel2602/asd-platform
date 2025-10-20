@@ -347,7 +347,6 @@ def add_data_to_db(data, submitter):
     if not element:
         return jsonify({"error": "Element is required"}), 400
     
-    # Step 01: Find the element or create if not present
     element_doc = collection.find_one({"element": element})
     if not element_doc:
         element_doc = {
@@ -355,7 +354,6 @@ def add_data_to_db(data, submitter):
             "materials": []
         }
         
-    # Step 02: Checking if material exists under the element
     material_doc = next(
         (m for m in element_doc["materials"] 
          if m["material"] == material and m["technique"] == technique), 
@@ -370,7 +368,6 @@ def add_data_to_db(data, submitter):
         }
         element_doc["materials"].append(material_doc)
         
-    # Step 03: Check if precursor-coreactant pair exists
     pair = f"{precursor}|{coreactant}"
     pair_doc = next((p for p in material_doc["pre_cor"] if p["precursor"] == precursor and p["coreactant"] == coreactant), None)
     if not pair_doc:
@@ -381,7 +378,6 @@ def add_data_to_db(data, submitter):
         }
         material_doc["pre_cor"].append(pair_doc)
         
-    # Step 04: Check if (surface + pretreatment + temperature) exists
     condition_doc = next(
         (c for c in pair_doc.get("conditions", []) 
          if c["surface"] == surface and 
@@ -459,7 +455,6 @@ def update_data():
         if not element_doc:
             return jsonify({"error": "Element not found"}), 404
 
-        # Step 1: Remove all publications from the original location
         original_material = next(
             (m for m in element_doc["materials"]
              if m["material"] == original["material"] and
@@ -483,9 +478,10 @@ def update_data():
                 if original_condition:
                     original_condition["publications"] = []
 
-        # Step 2: Add publications to their new locations
         for group in updated_groups:
             for pub_data in group["publications"]:
+                original_pub = pub_data.get("originalPublication")
+                
                 normalized_pub = {
                     "authors": pub_data.get("authors", []),
                     "title": pub_data.get("title", ""),
@@ -501,16 +497,22 @@ def update_data():
                 if not normalized_pub["authors"] and pub_data.get("author"):
                     normalized_pub["authors"] = [pub_data["author"]]
                 
-                # Ensure authors is always an array
                 if isinstance(normalized_pub["authors"], str):
                     normalized_pub["authors"] = [normalized_pub["authors"]]
 
                 pub_readings = next(
                     (r["readings"] for r in group["readings"]
-                    if publication_matches(r["publication"], pub_data)),
+                    if original_pub and publication_matches(r["publication"], original_pub)),
                     []
                 )
-                # Find or create target location for this publication
+                
+                if not pub_readings:
+                    pub_readings = next(
+                        (r["readings"] for r in group["readings"]
+                        if publication_matches(r["publication"], pub_data)),
+                        []
+                    )
+                
                 target_material = next(
                     (m for m in element_doc["materials"]
                      if m["material"] == group["material"] and
@@ -554,12 +556,21 @@ def update_data():
                     }
                     target_pair["conditions"].append(target_condition)
 
-                # Add publication to target location
-                existing_pub = next(
-                    (p for p in target_condition["publications"]
-                    if publication_matches(p["publication"], normalized_pub)),
-                    None
-                )
+                existing_pub = None
+                if original_pub:
+                    existing_pub = next(
+                        (p for p in target_condition["publications"]
+                        if publication_matches(p["publication"], original_pub)),
+                        None
+                    )
+                
+                if not existing_pub:
+                    existing_pub = next(
+                        (p for p in target_condition["publications"]
+                        if publication_matches(p["publication"], normalized_pub)),
+                        None
+                    )
+                
                 if existing_pub:
                     existing_pub["publication"] = normalized_pub
                     existing_pub["readings"] = pub_readings
@@ -574,7 +585,6 @@ def update_data():
                         }
                     })
 
-        # Step 3: Clean up empty structures
         for material in element_doc["materials"][:]:
             for pair in material["pre_cor"][:]:
                 pair["conditions"] = [c for c in pair["conditions"] if c["publications"]]
@@ -971,21 +981,30 @@ def get_readings():
         publication = json.loads(request.args.get('publication'))
 
         match_conditions = {}
-
+        
+        author_conditions = []
+        
         if publication.get("authors"):
             authors = publication["authors"]
             if isinstance(authors, list) and authors:
-                match_conditions["materials.pre_cor.conditions.publications.publication.authors"] = {"$in": [authors[0]]}
-            elif isinstance(authors, str):
-                match_conditions["materials.pre_cor.conditions.publications.publication.authors"] = {"$in": [authors]}
+                first_author = authors[0]
+                author_conditions.extend([
+                    {"materials.pre_cor.conditions.publications.publication.authors": {"$in": [first_author]}},
+                    {"materials.pre_cor.conditions.publications.publication.author": first_author}
+                ])
         elif publication.get("author"):
-            match_conditions["$or"] = [
-                {"materials.pre_cor.conditions.publications.publication.author": publication["author"]},
-                {"materials.pre_cor.conditions.publications.publication.authors": {"$in": [publication["author"]]}}
-            ]
+            author = publication["author"]
+            author_conditions.extend([
+                {"materials.pre_cor.conditions.publications.publication.author": author},
+                {"materials.pre_cor.conditions.publications.publication.authors": {"$in": [author]}}
+            ])
+        
+        if author_conditions:
+            match_conditions["$or"] = author_conditions
         
         if publication.get("journal"):
             match_conditions["materials.pre_cor.conditions.publications.publication.journal"] = publication["journal"]
+        
         if publication.get("year"):
             match_conditions["materials.pre_cor.conditions.publications.publication.year"] = publication["year"]
 
@@ -1007,19 +1026,75 @@ def get_readings():
             {"$unwind": "$materials.pre_cor.conditions.publications"},
             {"$match": match_conditions},
             {"$project": {
-                "readings": "$materials.pre_cor.conditions.publications.readings"
+                "readings": "$materials.pre_cor.conditions.publications.readings",
+                "publication": "$materials.pre_cor.conditions.publications.publication"
             }}
         ]
 
         result = list(collection.aggregate(pipeline))
+        
+        print(f"Found {len(result)} matching publications")
+        
+        if result:
+            for idx, r in enumerate(result):
+                pub = r.get('publication', {})
+                readings_count = len(r.get('readings', []))
+                print(f"  Match {idx + 1}: {pub.get('authors', [pub.get('author', 'Unknown')])} - {readings_count} readings")
 
         if not result:
+            print("No results found. Trying fallback query with just author...")
+            fallback_conditions = {}
+            
+            if publication.get("authors"):
+                authors = publication["authors"]
+                if isinstance(authors, list) and authors:
+                    fallback_conditions["$or"] = [
+                        {"materials.pre_cor.conditions.publications.publication.authors": {"$in": [authors[0]]}},
+                        {"materials.pre_cor.conditions.publications.publication.author": authors[0]}
+                    ]
+            elif publication.get("author"):
+                fallback_conditions["$or"] = [
+                    {"materials.pre_cor.conditions.publications.publication.author": publication["author"]},
+                    {"materials.pre_cor.conditions.publications.publication.authors": {"$in": [publication["author"]]}}
+                ]
+            
+            fallback_pipeline = [
+                {"$match": {"element": element}},
+                {"$unwind": "$materials"},
+                {"$match": {"materials.material": material}},
+                {"$unwind": "$materials.pre_cor"}, 
+                {"$match": {
+                    "materials.pre_cor.precursor": precursor,
+                    "materials.pre_cor.coreactant": coreactant
+                }},
+                {"$unwind": "$materials.pre_cor.conditions"},
+                {"$match": {
+                    "materials.pre_cor.conditions.surface": surface,
+                    "materials.pre_cor.conditions.pretreatment": pretreatment,
+                    "materials.pre_cor.conditions.temperature": temperature
+                }},
+                {"$unwind": "$materials.pre_cor.conditions.publications"},
+                {"$match": fallback_conditions},
+                {"$project": {
+                    "readings": "$materials.pre_cor.conditions.publications.readings",
+                    "publication": "$materials.pre_cor.conditions.publications.publication"
+                }}
+            ]
+            
+            result = list(collection.aggregate(fallback_pipeline))
+            print(f"Fallback query found {len(result)} results")
+
+        if not result:
+            print("Still no results. Returning empty array.")
             return jsonify([])
 
         readings = result[0].get('readings', [])
+        print(f"Returning {len(readings)} readings")
         return jsonify(readings)
 
     except Exception as e:
+        print(f"ERROR in get_readings: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
     
 @app.route("/api/element-data", methods=["GET"])
@@ -1177,8 +1252,6 @@ def get_element_data_by_surface():
         return jsonify({"error": "Internal server error"}), 500
 
 def publication_matches(stored_pub, target_pub):
-    """Check if a stored publication matches a target publication"""
-    # Handle both legacy author and new authors format
     stored_authors = stored_pub.get("authors", [stored_pub.get("author", "")])
     target_authors = target_pub.get("authors", [target_pub.get("author", "")])
     
@@ -1187,14 +1260,26 @@ def publication_matches(stored_pub, target_pub):
     if isinstance(target_authors, str):
         target_authors = [target_authors]
     
-    # Match on first author
-    first_author_match = (stored_authors and target_authors and 
-                         stored_authors[0] == target_authors[0])
+    if not (stored_authors and target_authors):
+        return False
     
-    journal_match = stored_pub.get('journal', '') == target_pub.get('journal', '')
-    year_match = stored_pub.get('year', '') == target_pub.get('year', '')
+    first_author_match = stored_authors[0] == target_authors[0]
+    if not first_author_match:
+        return False
     
-    return first_author_match and journal_match and year_match
+    stored_journal = stored_pub.get('journal', '')
+    target_journal = target_pub.get('journal', '')
+    if stored_journal and target_journal:
+        if stored_journal != target_journal:
+            return False
+    
+    stored_year = stored_pub.get('year', '')
+    target_year = target_pub.get('year', '')
+    if stored_year and target_year:
+        if stored_year != target_year:
+            return False
+    
+    return True
 
 @app.route("/api/delete-data", methods=["DELETE"])
 def delete_data():

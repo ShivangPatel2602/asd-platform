@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import config from "./config";
 import LoginPage from "./components/Login/LoginPage";
-import LandingPage from "./components/LandingPage/LandingPage";
 import FormInput from "./components/Form/FormInput";
 import MaterialSelector from "./components/Comparison/Comparison";
 import SubmissionReview from "./components/Submissions/Submission";

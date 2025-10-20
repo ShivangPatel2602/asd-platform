@@ -12,6 +12,7 @@ const EditData = ({ setUser, isAuthorized, user }) => {
   const [formData, setFormData] = useState(null);
   const [publications, setPublications] = useState([]);
   const [readings, setReadings] = useState([]);
+  const [originalPublications, setOriginalPublications] = useState([]);
   const [status, setStatus] = useState("");
   const [textareaContent, setTextareaContent] = useState({});
   const [publicationFields, setPublicationFields] = useState([]);
@@ -35,6 +36,9 @@ const EditData = ({ setUser, isAuthorized, user }) => {
     });
 
     setPublications(rowData.publications || []);
+    setOriginalPublications(
+      JSON.parse(JSON.stringify(rowData.publications || []))
+    );
 
     const initialPublicationFields = rowData.publications.map((pub) => ({
       material: rowData.material,
@@ -129,6 +133,7 @@ const EditData = ({ setUser, isAuthorized, user }) => {
 
         return {
           ...cleanPub,
+          originalPublication: originalPublications[index],
           parentFields: publicationFields[index].hasCustomFields
             ? publicationFields[index]
             : formData,
@@ -157,7 +162,6 @@ const EditData = ({ setUser, isAuthorized, user }) => {
         groups[key].readings.push(readings[idx]);
       });
 
-      // Prepare a single payload with all groups
       const payload = {
         original: {
           ...rowData,
@@ -174,7 +178,6 @@ const EditData = ({ setUser, isAuthorized, user }) => {
         })),
       };
 
-      // Send a single request
       const response = await fetch(
         `${config.BACKEND_API_URL}/api/update-data`,
         {
@@ -190,12 +193,25 @@ const EditData = ({ setUser, isAuthorized, user }) => {
       if (!response.ok) throw new Error("Update failed");
 
       setStatus("Data updated successfully!");
+
+      localStorage.clear();
+      sessionStorage.clear();
+
       setTimeout(() => {
-        navigate(`/comparison?element=${element}`, { replace: true });
-        window.location.reload();
+        const searchParams = new URLSearchParams();
+        const isSurfaceMode =
+          rowData.surface && rowData.surface.split(" ")[0] !== element;
+
+        if (isSurfaceMode) {
+          const surfaceElement = rowData.surface.split(" ")[0];
+          searchParams.append("surface", surfaceElement);
+        } else {
+          searchParams.append("element", element);
+        }
+
+        window.location.href = `/comparison?${searchParams.toString()}`;
       }, 1000);
     } catch (error) {
-      console.error("Error updating data:", error);
       setStatus(`Failed to update data: ${error.message}`);
     }
   };

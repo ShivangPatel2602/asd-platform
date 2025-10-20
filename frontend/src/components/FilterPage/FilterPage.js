@@ -38,7 +38,6 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
       });
   }, []);
 
-  // Fetch filtered options whenever a selection changes
   useEffect(() => {
     fetch(
       `${config.BACKEND_API_URL}/api/filter-options?material=${selectedMaterial}&surface=${selectedSurface}&technique=${selectedTechnique}`
