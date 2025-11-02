@@ -170,9 +170,28 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
     "pretreatment",
   ];
 
-  const getUniqueValues = (data, column) => {
+  const getUniqueValues = (
+    data,
+    column,
+    currentFilters,
+    excludeColumn = null
+  ) => {
+    let filteredData = data;
+
+    if (currentFilters && Object.keys(currentFilters).length > 0) {
+      filteredData = data.filter((row) => {
+        return Object.entries(currentFilters).every(
+          ([filterColumn, selectedValues]) => {
+            if (filterColumn === excludeColumn) return true;
+            if (!selectedValues || selectedValues.length === 0) return true;
+            return selectedValues.includes(row[filterColumn]);
+          }
+        );
+      });
+    }
+
     const values = new Set();
-    data.forEach((row) => {
+    filteredData.forEach((row) => {
       if (row[column] && row[column].trim()) {
         values.add(row[column]);
       }
@@ -1139,7 +1158,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
   };
 
   const FilterableHeader = ({ column, label }) => {
-    const uniqueValues = getUniqueValues(elementData, column);
+    const uniqueValues = getUniqueValues(elementData, column, columnFilters, column);
     const filterCount = columnFilters[column]?.length || 0;
     const headerRef = useRef(null);
     const dropdownRef = useRef(null);
@@ -1228,7 +1247,7 @@ const MaterialSelector = ({ setUser, isAuthorized, user }) => {
                     <span className="filter-value">{value}</span>
                     <span className="filter-count">
                       {
-                        elementData.filter((row) => row[column] === value)
+                        filteredElementData.filter((row) => row[column] === value)
                           .length
                       }
                     </span>

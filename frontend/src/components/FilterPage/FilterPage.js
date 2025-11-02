@@ -12,6 +12,11 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
   const [isProcessingQuery, setIsProcessingQuery] = useState(false);
   const [extractedParams, setExtractedParams] = useState(null);
   const [queryError, setQueryError] = useState("");
+  const [queryHistory, setQueryHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedHistoryItems, setSelectedHistoryItems] = useState([]);
+  const [currentQueryId, setCurrentQueryId] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,7 +41,14 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
         setSurfaces(data.surfaces);
         setTechniques(data.techniques);
       });
+    loadQueryHistoryCount();
   }, []);
+
+  useEffect(() => {
+    if (showHistory) {
+      loadQueryHistory();
+    }
+  }, [showHistory]);
 
   useEffect(() => {
     fetch(
@@ -50,7 +62,6 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
       });
   }, [selectedMaterial, selectedSurface, selectedTechnique]);
 
-  // Update URL when filters change
   useEffect(() => {
     const params = [];
     if (selectedMaterial)
@@ -60,14 +71,48 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
     if (selectedTechnique)
       params.push(`technique=${encodeURIComponent(selectedTechnique)}`);
     const queryString = params.length ? `?${params.join("&")}` : "";
-    // Only update if different to avoid infinite loop
     if (location.search !== queryString) {
       navigate(`/filter${queryString}`, { replace: true });
     }
-    // eslint-disable-next-line
   }, [selectedMaterial, selectedSurface, selectedTechnique]);
 
-  // On submit, navigate to /comparison with query params
+  const loadQueryHistoryCount = async () => {
+    try {
+      const response = await fetch(
+        `${config.BACKEND_API_URL}/api/query-history`,
+        { credentials: "include" }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setQueryHistory(data.queries || []);
+      }
+    } catch (error) {
+      console.error("Error loading query history count:", error);
+    }
+  };
+
+  const loadQueryHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(
+        `${config.BACKEND_API_URL}/api/query-history`,
+        { credentials: "include" }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setQueryHistory(data.queries || []);
+      } else {
+        console.error("Failed to load query history");
+      }
+    } catch (error) {
+      console.error("Error loading query history:", error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
@@ -117,6 +162,7 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
 
       const data = await response.json();
       setExtractedParams(data.parameters);
+      setCurrentQueryId(data.query_id);
     } catch (error) {
       console.error("Error processing query:", error);
       setQueryError("Failed to process your query. Please try again.");
@@ -141,8 +187,97 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
 
   const handleClearExtracted = () => {
     setExtractedParams(null);
+    setCurrentQueryId(null);
     setNaturalQuery("");
     setQueryError("");
+  };
+
+  const handleLoadHistoryQuery = (historyItem) => {
+    setNaturalQuery(historyItem.query);
+    setExtractedParams(historyItem.parameters);
+    setCurrentQueryId(historyItem._id);
+    setShowHistory(false);
+  };
+
+  const handleDeleteHistoryQuery = async (queryId, e) => {
+    e.stopPropagation();
+
+    if (!window.confirm("Are you sure you want to delete this query?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${config.BACKEND_API_URL}/api/query-history/${queryId}`,
+        { method: "DELETE", credentials: "include" }
+      );
+
+      if (response.ok) {
+        setQueryHistory(queryHistory.filter((q) => q._id !== queryId));
+      } else {
+        alert("Failed to delete query");
+      }
+    } catch (error) {
+      console.error("Error deleting query:", error);
+      alert("Failed to delete query");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedHistoryItems.length === 0) {
+      alert("Please select queries to delete");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${selectedHistoryItems.length} selected queries?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${config.BACKEND_API_URL}/api/query-history/bulk-delete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ query_ids: selectedHistoryItems }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setQueryHistory(
+          queryHistory.filter((q) => !selectedHistoryItems.includes(q._id))
+        );
+        setSelectedHistoryItems([]);
+        alert(`Successfully deleted ${data.deleted_count} queries`);
+      } else {
+        alert("Failed to delete queries");
+      }
+    } catch (error) {
+      console.error("Error bulk deleting queries:", error);
+      alert("Failed to delete queries");
+    }
+  };
+
+  const handleHistoryCheckbox = (queryId) => {
+    setSelectedHistoryItems((prev) =>
+      prev.includes(queryId)
+        ? prev.filter((id) => id !== queryId)
+        : [...prev, queryId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedHistoryItems.length === queryHistory.length) {
+      setSelectedHistoryItems([]);
+    } else {
+      setSelectedHistoryItems(queryHistory.map((q) => q._id));
+    }
   };
 
   return (
@@ -150,6 +285,115 @@ const FilterPage = ({ setUser, isAuthorized, user }) => {
       <Navbar setUser={setUser} isAuthorized={isAuthorized} user={user} />
       <div className="filter-page-container">
         <h1>Filter Data</h1>
+        <div className="query-history-section">
+          <button
+            className="toggle-history-btn"
+            onClick={() => setShowHistory(!showHistory)}
+          >
+            {showHistory ? "Hide Query History" : "View Query History"}{" "}
+            <span className="history-count">({queryHistory.length})</span>
+          </button>
+          {showHistory && (
+            <div className="history-panel">
+              <div className="history-header">
+                <h3>Your Past Queries</h3>
+                <div className="history-actions">
+                  {queryHistory.length > 0 && (
+                    <>
+                      <button
+                        onClick={handleSelectAll}
+                        className="select-all-btn"
+                      >
+                        {selectedHistoryItems.length === queryHistory.length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </button>
+                      {selectedHistoryItems.length > 0 && (
+                        <button
+                          onClick={handleBulkDelete}
+                          className="bulk-delete-btn"
+                        >
+                          Delete Selected ({selectedHistoryItems.length})
+                        </button>
+                      )}
+                      <button
+                        onClick={loadQueryHistory}
+                        className="refresh-history-btn"
+                        disabled={loadingHistory}
+                      >
+                        {loadingHistory ? "Loading..." : "Refresh"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {loadingHistory ? (
+                <div className="history-loading">Loading history...</div>
+              ) : queryHistory.length === 0 ? (
+                <div className="history-empty">
+                  No query history yet. Try asking a natural language query
+                  above!
+                </div>
+              ) : (
+                <div className="history-list">
+                  {queryHistory.map((item) => (
+                    <div
+                      key={item._id}
+                      className={`history-item ${
+                        selectedHistoryItems.includes(item._id)
+                          ? "selected"
+                          : ""
+                      }`}
+                    >
+                      <div className="history-item-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedHistoryItems.includes(item._id)}
+                          onChange={() => handleHistoryCheckbox(item._id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div
+                        className="history-item-content"
+                        onClick={() => handleLoadHistoryQuery(item)}
+                      >
+                        <div className="history-item-query">{item.query}</div>
+                        <div className="history-item-meta">
+                          <span className="history-timestamp">
+                            {new Date(item.timestamp).toLocaleString()}
+                          </span>
+                          {item.result_count !== null &&
+                            item.result_count !== undefined && (
+                              <span className="history-result-count">
+                                {item.result_count} results
+                              </span>
+                            )}
+                        </div>
+                        <div className="history-item-params">
+                          {Object.entries(item.parameters).map(
+                            ([key, value]) => (
+                              <span key={key} className="history-param-tag">
+                                {key}: {value}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="history-item-delete"
+                        onClick={(e) => handleDeleteHistoryQuery(item._id, e)}
+                        title="Delete this query"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="natural-query-section">
           <h2>Natural Language Query</h2>
           <p>

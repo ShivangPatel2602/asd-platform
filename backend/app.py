@@ -79,6 +79,7 @@ access_collection = db["access-requests"]
 approved_users = db["approved-users"]
 pending_submissions = db["pending-submissions"]
 authorized_users = db["authorized-users"]
+query_history = db["query-history"]
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
@@ -727,10 +728,24 @@ JSON response:"""
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if json_match:
             parameters = json.loads(json_match.group())
+
+            history_entry = {
+                "user_email": user['email'],
+                "user_name": user.get('name', 'Unknown'),
+                "query": query,
+                "parameters": parameters,
+                "timestamp": datetime.now(),
+                "result_count": None
+            }
+
+            result = query_history.insert_one(history_entry)
+            query_id = str(result.inserted_id)
+
             return jsonify({
                 "status": "success",
                 "parameters": parameters,
-                "original_query": query
+                "original_query": query,
+                "query_id": query_id
             })
         else:
             raise ValueError("No valid JSON in response")
@@ -741,6 +756,130 @@ JSON response:"""
             "error": f"Failed to extract parameters: {str(e)}"
         }), 500
         
+@app.route("/api/query-history", methods=["GET"])
+def get_query_history():
+    """Get all query history for the authenticated user"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        queries = list(query_history.find(
+            {"user_email": user['email']},
+            {"_id": 1, "query": 1, "parameters": 1, "timestamp": 1, "result_count": 1}
+        ).sort("timestamp", -1))
+        
+        for query in queries:
+            query['_id'] = str(query['_id'])
+            query['timestamp'] = query['timestamp'].isoformat()
+        
+        return jsonify({
+            "status": "success",
+            "queries": queries
+        })
+    except Exception as e:
+        print(f"Error fetching query history: {str(e)}")
+        return jsonify({"error": f"Failed to fetch query history: {str(e)}"}), 500
+    
+@app.route("/api/query-history/<query_id>", methods=["GET"])
+def get_query_detail(query_id):
+    """Get a specific query from history"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        query = query_history.find_one({
+            "_id": ObjectId(query_id),
+            "user_email": user['email']
+        })
+        
+        if not query:
+            return jsonify({"error": "Query not found"}), 404
+        
+        query['_id'] = str(query['_id'])
+        query['timestamp'] = query['timestamp'].isoformat()
+        
+        return jsonify({"status": "success", "query": query})
+    except Exception as e:
+        print(f"Error fetching query detail: {str(e)}")
+        return jsonify({"error": f"Failed to fetch query detail: {str(e)}"}), 500
+    
+@app.route("/api/query-history/<query_id>", methods=["DELETE"])
+def delete_query_history(query_id):
+    """Delete a specific query from history"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        result = query_history.delete_one({
+            "_id": ObjectId(query_id),
+            "user_email": user['email']
+        })
+        
+        if result.deleted_count == 0:
+            return jsonify({"error": "Query not found or already deleted"}), 404
+        
+        return jsonify({"status": "success", "message": "Query deleted successfully"})
+    except Exception as e:
+        print(f"Error deleting query: {str(e)}")
+        return jsonify({"error": f"Failed to delete query: {str(e)}"}), 500
+
+@app.route("/api/query-history/<query_id>/update-result-count", methods=["PUT"])
+def update_result_count(query_id):
+    """Update the result count for a query"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        data = request.get_json()
+        result_count = data.get('result_count', 0)
+        
+        result = query_history.update_one(
+            {"_id": ObjectId(query_id), "user_email": user['email']},
+            {"$set": {"result_count": result_count, "last_accessed": datetime.now()}}
+        )
+        
+        if result.matched_count == 0:
+            return jsonify({"error": "Query not found"}), 404
+        
+        return jsonify({"status": "success", "message": "Result count updated"})
+    except Exception as e:
+        print(f"Error updating result count: {str(e)}")
+        return jsonify({"error": f"Failed to update result count: {str(e)}"}), 500
+
+@app.route("/api/query-history/bulk-delete", methods=["POST"])
+def bulk_delete_queries():
+    """Delete multiple queries at once"""
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        data = request.get_json()
+        query_ids = data.get('query_ids', [])
+        
+        if not query_ids:
+            return jsonify({"error": "No query IDs provided"}), 400
+        
+        object_ids = [ObjectId(qid) for qid in query_ids]
+        
+        result = query_history.delete_many({
+            "_id": {"$in": object_ids},
+            "user_email": user['email']
+        })
+        
+        return jsonify({
+            "status": "success",
+            "deleted_count": result.deleted_count,
+            "message": f"Deleted {result.deleted_count} queries"
+        })
+    except Exception as e:
+        print(f"Error bulk deleting queries: {str(e)}")
+        return jsonify({"error": f"Failed to bulk delete queries: {str(e)}"}), 500
+
 @app.route("/api/materials", methods=["GET"])
 def get_materials():
     element = request.args.get("element")
